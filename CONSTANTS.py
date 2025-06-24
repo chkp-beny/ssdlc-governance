@@ -43,7 +43,7 @@ PRODUCT_SCM_TYPE = {
     "Datatube": "github",
     "Policy Insights": "github", 
     "SaaS": "gitlab",
-    "Cyberint": "bitbucket",
+    "Cyberint": "bitbucket_server",
     "Avanan": "github",
     "SASE": "github",
     "FWaaS": "github"
@@ -54,8 +54,22 @@ PRODUCT_ORGANIZATION_ID = {
     "Datatube": "0",
     "Policy Insights": "0",
     "SaaS": "0",
-    "Cyberint": "0", 
+    "Cyberint": "2", 
     "Avanan": "0",
     "SASE": "0",
     "FWaaS": "0"
 }
+
+# Product-JFrog Project Mapping
+PRODUCT_JFROG_PROJECT = {
+    "Datatube": "datatube",
+    "Policy Insights": "", 
+    "SaaS": "",
+    "Cyberint": "cyberint",
+    "Avanan": "hec",
+    "SASE": "",
+    "FWaaS": "fwaas"
+}
+
+# JFrog API Configuration
+JFROG_BASE_URL = "https://cpart.jfrog.io"

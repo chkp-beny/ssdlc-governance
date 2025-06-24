@@ -4,6 +4,7 @@ Contains clients for Compass, JFrog, and Sonar APIs
 """
 
 import logging
+import requests
 from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -24,49 +25,111 @@ class CompassClient:
             base_url (str): Base URL for Compass API
         """
         self.access_token = access_token
-        self.base_url = base_url
-        self.session = None  # Will be implemented later
+        self.base_url = base_url.rstrip('/')  # Remove trailing slash
+        self.headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
         
         logger.info("CompassClient initialized")
     
-    def test_connection(self) -> bool:
+    def test_connection(self, scm_type: str = 'bitbucket-onprem', organization_id: str = '2') -> bool:
         """
         Test connection to Compass API
+        
+        Args:
+            scm_type (str): SCM type to test with (default: bitbucket-onprem for Cyberint)
+            organization_id (str): Organization ID to test with (default: 2 for Cyberint)
         
         Returns:
             bool: True if connection successful
         """
-        # TODO: Implement connection test
-        logger.info("Testing Compass API connection...")
-        return True
+        try:
+            # Simple GET request to test connection
+            response = requests.get(
+                f"{self.base_url}/repositories",
+                headers=self.headers,
+                params={'type': scm_type, 'organization_id': organization_id, 'limit': 1},
+                timeout=10
+            )
+            success = response.status_code == 200
+            logger.info("Compass API connection test: %s", "SUCCESS" if success else "FAILED")
+            return success
+        except requests.exceptions.RequestException as e:
+            logger.error("Compass API connection test failed: %s", str(e))
+            return False
     
     def fetch_repositories(self, scm_type: str, organization_id: str) -> List[Dict]:
         """
-        Fetch repositories from Compass API
+        Fetch repositories from Compass API with pagination support
         
         Args:
-            scm_type (str): SCM type (github, gitlab, bitbucket)
+            scm_type (str): SCM type (github, gitlab, bitbucket-onprem, etc.)
             organization_id (str): Organization ID
             
         Returns:
             List[Dict]: List of repository data
         """
-        # TODO: Implement actual API call
-        logger.info(f"Fetching repositories for {scm_type}, org: {organization_id}")
-        
-        # Mock response for now
-        return [
-            {
-                "id": "repo1",
-                "name": "sample-repo-1",
-                "url": f"https://{scm_type}.com/org/sample-repo-1"
-            },
-            {
-                "id": "repo2", 
-                "name": "sample-repo-2",
-                "url": f"https://{scm_type}.com/org/sample-repo-2"
-            }
-        ]
+        try:
+            logger.info("Fetching repositories for type: %s, org: %s", scm_type, organization_id)
+            
+            # Build the API endpoint
+            url = f"{self.base_url}/repositories"
+            all_repositories = []
+            page = 1
+            limit = 1000  # Reasonable page size
+            
+            while True:
+                # Parameters for the API call
+                params = {
+                    'type': scm_type,
+                    'organization_id': organization_id,
+                    'limit': limit,
+                    'page': page
+                }
+                
+                logger.debug("Fetching page %d with limit %d", page, limit)
+                
+                # Make the API request
+                response = requests.get(
+                    url,
+                    headers=self.headers,
+                    params=params,
+                    timeout=30
+                )
+                
+                # Check if request was successful
+                if response.status_code == 200:
+                    data = response.json()
+                    repositories = data.get('repositories', [])
+                    pagination = data.get('pagination', {})
+                    
+                    # Add repositories to our collection
+                    all_repositories.extend(repositories)
+                    
+                    logger.debug("Page %d: fetched %d repositories", page, len(repositories))
+                    
+                    # Check if we have more pages
+                    total_pages = pagination.get('pages', 1)
+                    if page >= total_pages or len(repositories) == 0:
+                        break
+                    
+                    page += 1
+                else:
+                    logger.error("API request failed with status %d: %s", 
+                               response.status_code, response.text)
+                    break
+            
+            logger.info("Successfully fetched %d repositories across %d pages", 
+                       len(all_repositories), page)
+            return all_repositories
+                
+        except requests.exceptions.RequestException as e:
+            logger.error("Error fetching repositories: %s", str(e))
+            return []
+        except Exception as e:
+            logger.error("Unexpected error fetching repositories: %s", str(e))
+            return []
     
     def fetch_vulnerabilities(self, repository_ids: List[str]) -> Dict:
         """
@@ -97,35 +160,104 @@ class CompassClient:
         return {}
 
 
-class JFrogClient:
+class JfrogClient:
     """
     Client for JFrog API integration
-    Handles CI/CD pipeline data
+    Handles build information and CI status fetching
     """
     
-    def __init__(self, access_token: str, base_url: str):
+    def __init__(self, access_token: str):
         """
         Initialize JFrog client
         
         Args:
-            access_token (str): API access token
-            base_url (str): Base URL for JFrog API
+            access_token (str): JFrog API access token
         """
-        self.access_token = access_token
-        self.base_url = base_url
+        # Import constants for base URL
+        try:
+            from CONSTANTS import JFROG_BASE_URL
+        except ImportError:
+            import sys
+            import os
+            sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+            from CONSTANTS import JFROG_BASE_URL
         
-        logger.info("JFrogClient initialized")
+        self.access_token = access_token
+        self.base_url = JFROG_BASE_URL.rstrip('/')
+        self.headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        logger.info("JfrogClient initialized with base URL: %s", self.base_url)
     
     def test_connection(self) -> bool:
         """
-        Test connection to JFrog API
+        Test connection to JFrog API using the ping endpoint
         
         Returns:
             bool: True if connection successful
         """
-        # TODO: Implement connection test
-        logger.info("Testing JFrog API connection...")
-        return True
+        try:
+            # Use ping endpoint for connection test (no auth required)
+            response = requests.get(
+                f"{self.base_url}/xray/api/v1/system/ping",
+                timeout=10
+            )
+            success = response.status_code == 200
+            if success:
+                data = response.json()
+                success = data.get('status') == 'pong'
+            
+            logger.info("JFrog API connection test: %s", "SUCCESS" if success else "FAILED")
+            return success
+        except requests.exceptions.RequestException as e:
+            logger.error("JFrog API connection test failed: %s", str(e))
+            return False
+    
+    def fetch_build_info(self, project: str) -> dict:
+        """
+        Fetch build information from JFrog API for a project
+        Returns the raw JSON response for processing by the caller
+        
+        Args:
+            project (str): Project name
+            
+        Returns:
+            dict: Raw JSON response from JFrog API
+        """
+        try:
+            logger.info("Fetching JFrog build info for project: %s", project)
+            
+            # Build the API endpoint
+            url = f"{self.base_url}/artifactory/api/build"
+            
+            # Parameters for the API call
+            params = {'project': project}
+            
+            # Make the API request
+            response = requests.get(
+                url,
+                headers=self.headers,
+                params=params,
+                timeout=30
+            )
+            
+            # Check if request was successful
+            if response.status_code == 200:
+                data = response.json()
+                logger.info("Successfully fetched build info for project %s", project)
+                return data
+            else:
+                logger.error("JFrog API error: %s - %s", response.status_code, response.text)
+                return {}
+                
+        except requests.exceptions.RequestException as e:
+            logger.error("JFrog API request failed: %s", str(e))
+            return {}
+        except Exception as e:
+            logger.error("Error processing JFrog build info: %s", str(e))
+            return {}
 
 
 class SonarClient:
@@ -182,7 +314,7 @@ class DataLoader:
         self.compass_client = CompassClient(compass_token, compass_url)
         
         # Initialize optional clients
-        self.jfrog_client = JFrogClient(jfrog_token, jfrog_url) if jfrog_token and jfrog_url else None
+        self.jfrog_client = JfrogClient(jfrog_token) if jfrog_token else None
         self.sonar_client = SonarClient(sonar_token, sonar_url) if sonar_token and sonar_url else None
         
         logger.info("DataLoader initialized with clients")

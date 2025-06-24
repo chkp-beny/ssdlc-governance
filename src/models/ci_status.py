@@ -89,6 +89,11 @@ class JfrogCIStatus:
         """Get count of deployed artifacts"""
         return len(self.deployed_artifacts)
     
+    def set_exists(self, exists: bool):
+        """Set JFrog CI existence status"""
+        self.is_exist = exists
+        logger.debug("JfrogCIStatus.is_exist updated to: %s", exists)
+    
     def __str__(self) -> str:
         """String representation of JFrog CI status"""
         return f"JfrogCI(exists={self.is_exist}, artifacts={len(self.deployed_artifacts)})"

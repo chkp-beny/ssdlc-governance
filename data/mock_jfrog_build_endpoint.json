@@ -1,0 +1,425 @@
+{
+    "builds": [
+        {
+            "uri": "/identity-utils",
+            "lastStarted": "2025-04-24T12:14:00.685+0000"
+        },
+        {
+            "uri": "/node-service-common",
+            "lastStarted": "2025-05-12T07:41:11.833+0000"
+        },
+        {
+            "uri": "/env-insights-service",
+            "lastStarted": "2025-05-19T07:57:17.890+0000"
+        },
+        {
+            "uri": "/frontend-socket-service",
+            "lastStarted": "2025-05-19T08:21:53.472+0000"
+        },
+        {
+            "uri": "/phishing-beacon-manager",
+            "lastStarted": "2025-05-19T08:37:35.552+0000"
+        },
+        {
+            "uri": "/tenant-mgmt-service",
+            "lastStarted": "2025-05-19T12:15:15.955+0000"
+        },
+        {
+            "uri": "/online-help",
+            "lastStarted": "2025-05-19T13:08:41.573+0000"
+        },
+        {
+            "uri": "/web-socket-client",
+            "lastStarted": "2025-05-19T13:49:29.254+0000"
+        },
+        {
+            "uri": "/design-system-components",
+            "lastStarted": "2025-05-19T14:11:19.342+0000"
+        },
+        {
+            "uri": "/report-service",
+            "lastStarted": "2025-05-19T14:36:18.528+0000"
+        },
+        {
+            "uri": "/ioc-chrome-extension",
+            "lastStarted": "2025-05-19T14:45:37.594+0000"
+        },
+        {
+            "uri": "/alert-loader",
+            "lastStarted": "2025-06-09T07:21:30.478+0000"
+        },
+        {
+            "uri": "/alert-status-update-handler",
+            "lastStarted": "2025-06-09T07:29:17.531+0000"
+        },
+        {
+            "uri": "/alert-service",
+            "lastStarted": "2025-06-09T07:41:46.013+0000"
+        },
+        {
+            "uri": "/asset-recommendation-service",
+            "lastStarted": "2025-06-09T08:27:59.143+0000"
+        },
+        {
+            "uri": "/asm-bot",
+            "lastStarted": "2025-06-09T08:29:19.209+0000"
+        },
+        {
+            "uri": "/asset-validation",
+            "lastStarted": "2025-06-09T08:29:24.156+0000"
+        },
+        {
+            "uri": "/asset-configuration",
+            "lastStarted": "2025-06-09T08:30:53.537+0000"
+        },
+        {
+            "uri": "/argos-opencti-connector",
+            "lastStarted": "2025-06-09T08:30:58.853+0000"
+        },
+        {
+            "uri": "/assets-scan-manager",
+            "lastStarted": "2025-06-09T09:46:27.107+0000"
+        },
+        {
+            "uri": "/automatic-phishing-event-preparer",
+            "lastStarted": "2025-06-09T09:46:30.070+0000"
+        },
+        {
+            "uri": "/automatic-alerts-research",
+            "lastStarted": "2025-06-09T09:46:50.494+0000"
+        },
+        {
+            "uri": "/assets-enrichment",
+            "lastStarted": "2025-06-09T09:47:08.729+0000"
+        },
+        {
+            "uri": "/assets-loader",
+            "lastStarted": "2025-06-09T09:50:00.952+0000"
+        },
+        {
+            "uri": "/automatic-alert-generator",
+            "lastStarted": "2025-06-09T09:52:43.096+0000"
+        },
+        {
+            "uri": "/assets-discovery",
+            "lastStarted": "2025-06-09T10:14:43.655+0000"
+        },
+        {
+            "uri": "/bestwhois-loader",
+            "lastStarted": "2025-06-09T10:35:42.127+0000"
+        },
+        {
+            "uri": "/business-gateway",
+            "lastStarted": "2025-06-09T10:36:00.447+0000"
+        },
+        {
+            "uri": "/cleaner-service",
+            "lastStarted": "2025-06-09T10:36:36.677+0000"
+        },
+        {
+            "uri": "/cloud-storage-service",
+            "lastStarted": "2025-06-09T10:36:38.414+0000"
+        },
+        {
+            "uri": "/cp-web-rep-evaluator",
+            "lastStarted": "2025-06-09T10:36:42.432+0000"
+        },
+        {
+            "uri": "/c3-lead-findings",
+            "lastStarted": "2025-06-09T10:37:15.949+0000"
+        },
+        {
+            "uri": "/customer-service",
+            "lastStarted": "2025-06-09T11:25:07.103+0000"
+        },
+        {
+            "uri": "/discovery-job-monitor",
+            "lastStarted": "2025-06-09T11:25:19.349+0000"
+        },
+        {
+            "uri": "/customer-statistics-service",
+            "lastStarted": "2025-06-09T11:25:37.111+0000"
+        },
+        {
+            "uri": "/discovery-job-finalizer",
+            "lastStarted": "2025-06-09T11:25:41.605+0000"
+        },
+        {
+            "uri": "/daily-feed-ingestor",
+            "lastStarted": "2025-06-09T11:26:08.804+0000"
+        },
+        {
+            "uri": "/discord-loader",
+            "lastStarted": "2025-06-09T11:26:25.887+0000"
+        },
+        {
+            "uri": "/customer-usage-service",
+            "lastStarted": "2025-06-09T11:26:29.046+0000"
+        },
+        {
+            "uri": "/discovery",
+            "lastStarted": "2025-06-09T11:27:23.134+0000"
+        },
+        {
+            "uri": "/cve-intel",
+            "lastStarted": "2025-06-09T11:28:41.622+0000"
+        },
+        {
+            "uri": "/entity-store",
+            "lastStarted": "2025-06-09T13:07:38.349+0000"
+        },
+        {
+            "uri": "/domain-scan-service",
+            "lastStarted": "2025-06-09T13:08:46.095+0000"
+        },
+        {
+            "uri": "/domain-whois-loader",
+            "lastStarted": "2025-06-09T13:09:23.267+0000"
+        },
+        {
+            "uri": "/exploitability-scan-manager",
+            "lastStarted": "2025-06-09T13:13:36.237+0000"
+        },
+        {
+            "uri": "/domain-whois-service",
+            "lastStarted": "2025-06-09T13:14:39.314+0000"
+        },
+        {
+            "uri": "/domain-service",
+            "lastStarted": "2025-06-09T13:20:21.215+0000"
+        },
+        {
+            "uri": "/intel-item-tracker",
+            "lastStarted": "2025-06-09T14:05:10.631+0000"
+        },
+        {
+            "uri": "/identity-manager",
+            "lastStarted": "2025-06-09T14:05:39.484+0000"
+        },
+        {
+            "uri": "/impactometer-service",
+            "lastStarted": "2025-06-09T14:05:47.250+0000"
+        },
+        {
+            "uri": "/hapoalim-iocfeed-service",
+            "lastStarted": "2025-06-09T14:06:43.178+0000"
+        },
+        {
+            "uri": "/google-ads-connector",
+            "lastStarted": "2025-06-09T14:07:36.836+0000"
+        },
+        {
+            "uri": "/infinity-connector",
+            "lastStarted": "2025-06-09T14:08:02.395+0000"
+        },
+        {
+            "uri": "/incubation-bridge",
+            "lastStarted": "2025-06-09T14:08:13.280+0000"
+        },
+        {
+            "uri": "/feed-ingestor",
+            "lastStarted": "2025-06-09T14:08:31.035+0000"
+        },
+        {
+            "uri": "/github-commit-monitor",
+            "lastStarted": "2025-06-09T14:10:06.920+0000"
+        },
+        {
+            "uri": "/issues-loader",
+            "lastStarted": "2025-06-09T14:24:57.103+0000"
+        },
+        {
+            "uri": "/ip-service",
+            "lastStarted": "2025-06-09T14:25:49.458+0000"
+        },
+        {
+            "uri": "/ioc-api",
+            "lastStarted": "2025-06-09T14:30:01.855+0000"
+        },
+        {
+            "uri": "/marketing-api",
+            "lastStarted": "2025-06-09T16:05:25.375+0000"
+        },
+        {
+            "uri": "/knowledge-bot",
+            "lastStarted": "2025-06-09T16:05:58.680+0000"
+        },
+        {
+            "uri": "/issues-scan-manager",
+            "lastStarted": "2025-06-09T16:06:01.703+0000"
+        },
+        {
+            "uri": "/leaked-credentials-api",
+            "lastStarted": "2025-06-09T16:06:20.451+0000"
+        },
+        {
+            "uri": "/login-interface-scanner",
+            "lastStarted": "2025-06-09T16:06:37.564+0000"
+        },
+        {
+            "uri": "/leaked-credentials-exporter",
+            "lastStarted": "2025-06-09T16:06:47.633+0000"
+        },
+        {
+            "uri": "/knowledgebase-service",
+            "lastStarted": "2025-06-09T16:06:57.377+0000"
+        },
+        {
+            "uri": "/malware-log-files-uploader",
+            "lastStarted": "2025-06-09T16:12:16.834+0000"
+        },
+        {
+            "uri": "/on-call-bot",
+            "lastStarted": "2025-06-10T09:21:19.715+0000"
+        },
+        {
+            "uri": "/metrics-tornado-service",
+            "lastStarted": "2025-06-10T09:22:19.346+0000"
+        },
+        {
+            "uri": "/notification-service",
+            "lastStarted": "2025-06-10T09:22:26.265+0000"
+        },
+        {
+            "uri": "/meta-ads-connector",
+            "lastStarted": "2025-06-10T09:22:28.252+0000"
+        },
+        {
+            "uri": "/messages-service",
+            "lastStarted": "2025-06-10T09:23:50.501+0000"
+        },
+        {
+            "uri": "/nuclei-service",
+            "lastStarted": "2025-06-10T09:24:54.951+0000"
+        },
+        {
+            "uri": "/open-web-interfaces-service",
+            "lastStarted": "2025-06-10T09:26:10.959+0000"
+        },
+        {
+            "uri": "/mdf-service",
+            "lastStarted": "2025-06-10T09:29:32.679+0000"
+        },
+        {
+            "uri": "/phishint-certstream-connector",
+            "lastStarted": "2025-06-11T12:19:04.964+0000"
+        },
+        {
+            "uri": "/phishing-configuration",
+            "lastStarted": "2025-06-11T12:19:42.709+0000"
+        },
+        {
+            "uri": "/phishing-kit-research",
+            "lastStarted": "2025-06-11T12:20:03.201+0000"
+        },
+        {
+            "uri": "/phishint-candidate-monitoring",
+            "lastStarted": "2025-06-11T12:20:27.287+0000"
+        },
+        {
+            "uri": "/panoptes-ai",
+            "lastStarted": "2025-06-11T12:20:47.395+0000"
+        },
+        {
+            "uri": "/phishint-core",
+            "lastStarted": "2025-06-11T12:21:07.220+0000"
+        },
+        {
+            "uri": "/phishing-beacon-receiver",
+            "lastStarted": "2025-06-11T12:24:21.025+0000"
+        },
+        {
+            "uri": "/scoring-manager",
+            "lastStarted": "2025-06-11T13:21:23.809+0000"
+        },
+        {
+            "uri": "/report-collaboration",
+            "lastStarted": "2025-06-11T13:23:59.996+0000"
+        },
+        {
+            "uri": "/secrets-discovery",
+            "lastStarted": "2025-06-11T14:23:42.735+0000"
+        },
+        {
+            "uri": "/shodan-service",
+            "lastStarted": "2025-06-11T14:24:34.735+0000"
+        },
+        {
+            "uri": "/sonar-service",
+            "lastStarted": "2025-06-11T14:25:07.007+0000"
+        },
+        {
+            "uri": "/takedown-monitor",
+            "lastStarted": "2025-06-11T14:25:22.112+0000"
+        },
+        {
+            "uri": "/takedown-response-monitor",
+            "lastStarted": "2025-06-11T14:26:19.787+0000"
+        },
+        {
+            "uri": "/ssl-certificate-service",
+            "lastStarted": "2025-06-11T14:27:25.173+0000"
+        },
+        {
+            "uri": "/social-pages",
+            "lastStarted": "2025-06-11T14:27:43.949+0000"
+        },
+        {
+            "uri": "/supply-chain-api",
+            "lastStarted": "2025-06-11T14:30:19.184+0000"
+        },
+        {
+            "uri": "/technology-discovery-manager",
+            "lastStarted": "2025-06-11T15:06:47.676+0000"
+        },
+        {
+            "uri": "/telegram-data-bridge",
+            "lastStarted": "2025-06-11T15:07:01.823+0000"
+        },
+        {
+            "uri": "/telegram-loader",
+            "lastStarted": "2025-06-11T15:08:00.987+0000"
+        },
+        {
+            "uri": "/takedown-service",
+            "lastStarted": "2025-06-11T15:08:28.815+0000"
+        },
+        {
+            "uri": "/tc-brand-connector",
+            "lastStarted": "2025-06-11T15:08:37.221+0000"
+        },
+        {
+            "uri": "/technology-detector",
+            "lastStarted": "2025-06-11T15:10:06.589+0000"
+        },
+        {
+            "uri": "/telegram-malware-log-downloader",
+            "lastStarted": "2025-06-11T15:45:46.924+0000"
+        },
+        {
+            "uri": "/threat-fox-feed-collector",
+            "lastStarted": "2025-06-11T15:46:03.197+0000"
+        },
+        {
+            "uri": "/virus-total-async-service",
+            "lastStarted": "2025-06-12T07:16:36.217+0000"
+        },
+        {
+            "uri": "/user-service",
+            "lastStarted": "2025-06-12T07:16:47.902+0000"
+        },
+        {
+            "uri": "/vt-loader",
+            "lastStarted": "2025-06-12T07:22:31.225+0000"
+        },
+        {
+            "uri": "/leaked-credentials-service",
+            "lastStarted": "2025-06-24T08:55:27.983+0000"
+        },
+        {
+            "uri": "/frontend-service",
+            "lastStarted": "2025-06-24T13:10:28.437+0000"
+        }
+    ],
+    "uri": "https://cpart.jfrog.io/artifactory/api/build?buildRepo=cyberint-build-info"
+}
