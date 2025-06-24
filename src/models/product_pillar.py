@@ -48,25 +48,6 @@ class ProductPillar:
         self.products.append(product)
         logger.info(f"Product '{product.name}' added to pillar '{self.name}'")
     
-    def remove_product(self, product_name: str) -> bool:
-        """
-        Remove a product from this pillar
-        
-        Args:
-            product_name (str): Name of the product to remove
-            
-        Returns:
-            bool: True if product was removed, False if not found
-        """
-        for i, product in enumerate(self.products):
-            if product.name == product_name:
-                removed_product = self.products.pop(i)
-                logger.info(f"Product '{removed_product.name}' removed from pillar '{self.name}'")
-                return True
-        
-        logger.warning(f"Product '{product_name}' not found in pillar '{self.name}'")
-        return False
-    
     def get_product(self, product_name: str) -> Optional[Product]:
         """
         Get a specific product by name
@@ -81,15 +62,6 @@ class ProductPillar:
             if product.name == product_name:
                 return product
         return None
-    
-    def get_total_repos_count(self) -> int:
-        """
-        Get total number of repositories across all products in this pillar
-        
-        Returns:
-            int: Total repository count
-        """
-        return sum(len(product.repos) for product in self.products)
     
     def __str__(self) -> str:
         return f"ProductPillar(name='{self.name}', products={len(self.products)})"

@@ -6,13 +6,14 @@ import pytest
 import sys
 import os
 
-# Add src and root to path for imports
+# Add src and root to path for imports  
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'config'))
 
-from models.product import Product, DevOps
-from CONSTANTS import PRODUCT_DEVOPS
+from models.product import Product
+from models.devops import DevOps
+from CONSTANTS import PRODUCT_DEVOPS, PRODUCT_SCM_TYPE, PRODUCT_ORGANIZATION_ID
 
 
 class TestDevOps:
@@ -60,59 +61,34 @@ class TestProduct:
     
     def test_init_minimal(self):
         """Test Product initialization with minimal parameters"""
-        product = Product("Datatube")
+        product = Product("Datatube", "github", "0")
         
         assert product.name == "Datatube"
+        assert product.scm_type == "github"
+        assert product.organization_id == "0"
         assert product.devops is None
-        assert product.description is None
         assert product.repos == []
     
     def test_init_with_devops(self, datatube_devops):
         """Test Product initialization with DevOps"""
-        product = Product("Datatube", datatube_devops)
+        product = Product("Datatube", "github", "0", datatube_devops)
         
         assert product.name == "Datatube"
+        assert product.scm_type == "github"
+        assert product.organization_id == "0"
         assert product.devops == datatube_devops
-        assert product.description is None
         assert product.repos == []
     
-    def test_set_devops_success(self, datatube_devops):
-        """Test setting DevOps contact"""
-        product = Product("TestProduct")
+    def test_get_repos_count(self):
+        """Test repository count"""
+        product = Product("TestProduct", "github", "0")
         
-        product.set_devops(datatube_devops)
-        
-        assert product.devops == datatube_devops
-    
-    def test_set_devops_invalid_type(self):
-        """Test setting invalid DevOps type raises TypeError"""
-        product = Product("TestProduct")
-        
-        with pytest.raises(TypeError, match="Expected DevOps instance"):
-            product.set_devops("not a devops object")
-    
-    def test_add_repo(self):
-        """Test adding repository"""
-        product = Product("TestProduct")
-        mock_repo = "test-repo"
-        
-        product.add_repo(mock_repo)
-        
-        assert len(product.repos) == 1
-        assert product.repos[0] == mock_repo
-    
-    def test_has_devops_contact(self, datatube_devops):
-        """Test has_devops_contact method"""
-        product_without_devops = Product("TestProduct")
-        product_with_devops = Product("TestProduct", datatube_devops)
-        
-        assert product_without_devops.has_devops_contact() is False
-        assert product_with_devops.has_devops_contact() is True
+        assert product.get_repos_count() == 0
     
     def test_str_representation(self, datatube_devops, datatube_devops_info):
         """Test string representation"""
-        product = Product("Datatube", datatube_devops)
+        product = Product("Datatube", "github", "0", datatube_devops)
         result = str(product)
-        expected = f"Product(name='Datatube', repos=0, devops='{datatube_devops_info['name']}')"
+        expected = f"Product(name='Datatube', scm='github', org_id='0', repos=0, devops='{datatube_devops_info['name']}')"
         
         assert result == expected

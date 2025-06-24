@@ -1,0 +1,52 @@
+{
+  "docker://staging/incubation-bridge:ccd945e05de9baae8c3bbc6aa54dd6b8633fa628": {
+    "vulnerabilities": {
+      "critical": 3,
+      "high": 7,
+      "medium": 12,
+      "low": 5,
+      "unknown": 1
+    },
+    "updated_at": "2024-12-20T14:30:45.123456"
+  },
+  "docker://staging/feed-ingestor:6f8e60178bda53ab16ecd6802bf8fe7a4ffb04b3": {
+    "vulnerabilities": {
+      "critical": 1,
+      "high": 4,
+      "medium": 8,
+      "low": 2,
+      "unknown": 0
+    },
+    "updated_at": "2024-12-20T14:25:12.789012"
+  },
+  "docker://staging/github-commit-monitor:latest": {
+    "vulnerabilities": {
+      "critical": 0,
+      "high": 2,
+      "medium": 3,
+      "low": 1,
+      "unknown": 0
+    },
+    "updated_at": "2024-12-20T13:45:33.456789"
+  },
+  "docker://production/user-service:v2.1.0": {
+    "vulnerabilities": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "unknown": 0
+    },
+    "updated_at": "2024-12-20T12:15:20.111222"
+  },
+  "docker://staging/data-processor:f3a2b1c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0": {
+    "vulnerabilities": {
+      "critical": 2,
+      "high": 6,
+      "medium": 15,
+      "low": 8,
+      "unknown": 1
+    },
+    "updated_at": "2024-12-20T11:30:18.654321"
+  }
+}

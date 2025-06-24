@@ -1,0 +1,112 @@
+{
+  "company-incubation-bridge": {
+    "BUG": {
+      "issues": {
+        "CRITICAL": 2,
+        "MAJOR": 8,
+        "MINOR": 15,
+        "INFO": 3
+      },
+      "updated_at": "2024-12-20T14:22:18.654321"
+    },
+    "VULNERABILITY": {
+      "issues": {
+        "CRITICAL": 1,
+        "HIGH": 4,
+        "MEDIUM": 2,
+        "LOW": 0
+      },
+      "updated_at": "2024-12-20T14:22:18.654321"
+    },
+    "CODE_SMELL": {
+      "issues": {
+        "MAJOR": 25,
+        "MINOR": 42,
+        "INFO": 18
+      },
+      "updated_at": "2024-12-20T14:22:18.654321"
+    }
+  },
+  "company-feed-ingestor": {
+    "BUG": {
+      "issues": {
+        "BLOCKER": 1,
+        "CRITICAL": 0,
+        "MAJOR": 3,
+        "MINOR": 7
+      },
+      "updated_at": "2024-12-20T13:55:42.987654"
+    },
+    "SECURITY_HOTSPOT": {
+      "issues": {
+        "HIGH": 2,
+        "MEDIUM": 5,
+        "LOW": 1
+      },
+      "updated_at": "2024-12-20T13:55:42.987654"
+    },
+    "CODE_SMELL": {
+      "issues": {
+        "MAJOR": 18,
+        "MINOR": 32,
+        "INFO": 12
+      },
+      "updated_at": "2024-12-20T13:55:42.987654"
+    }
+  },
+  "company-github-commit-monitor": {
+    "BUG": {
+      "issues": {
+        "MAJOR": 4,
+        "MINOR": 9,
+        "INFO": 2
+      },
+      "updated_at": "2024-12-20T12:30:15.123987"
+    },
+    "VULNERABILITY": {
+      "issues": {
+        "MEDIUM": 1,
+        "LOW": 2
+      },
+      "updated_at": "2024-12-20T12:30:15.123987"
+    }
+  },
+  "company-user-service": {
+    "CODE_SMELL": {
+      "issues": {
+        "MAJOR": 12,
+        "MINOR": 28,
+        "INFO": 9
+      },
+      "updated_at": "2024-12-20T11:45:33.456789"
+    }
+  },
+  "company-data-processor": {
+    "BUG": {
+      "issues": {
+        "CRITICAL": 1,
+        "MAJOR": 6,
+        "MINOR": 11,
+        "INFO": 4
+      },
+      "updated_at": "2024-12-20T10:20:45.789123"
+    },
+    "VULNERABILITY": {
+      "issues": {
+        "CRITICAL": 2,
+        "HIGH": 3,
+        "MEDIUM": 1,
+        "LOW": 0
+      },
+      "updated_at": "2024-12-20T10:20:45.789123"
+    },
+    "SECURITY_HOTSPOT": {
+      "issues": {
+        "HIGH": 1,
+        "MEDIUM": 3,
+        "LOW": 2
+      },
+      "updated_at": "2024-12-20T10:20:45.789123"
+    }
+  }
+}

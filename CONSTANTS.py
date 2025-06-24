@@ -42,8 +42,8 @@ PRODUCT_DEVOPS = {
 PRODUCT_SCM_TYPE = {
     "Datatube": "github",
     "Policy Insights": "github", 
-    "SaaS": "github",
-    "Cyberint": "github",
+    "SaaS": "gitlab",
+    "Cyberint": "bitbucket",
     "Avanan": "github",
     "SASE": "github",
     "FWaaS": "github"
