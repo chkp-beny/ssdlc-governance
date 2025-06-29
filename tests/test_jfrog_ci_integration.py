@@ -57,8 +57,8 @@ class TestJfrogCIIntegration:
                    if repo.ci_status.jfrog_status.is_exist][:10]
         print(f"Sample repositories with JFrog CI: {ci_repos}")
     
-    def test_jfrog_client_fetch_build_info(self):
-        """Test JFrog client fetch_build_info returns JSON with URI fields starting with /"""
+    def test_jfrog_client_fetch_all_project_builds(self):
+        """Test JFrog client fetch_all_project_builds returns JSON with URI fields starting with /"""
         # Get JFrog token
         jfrog_token = os.getenv('CYBERINT_JFROG_ACCESS_TOKEN')
         assert jfrog_token, "CYBERINT_JFROG_ACCESS_TOKEN not found in environment"
@@ -68,7 +68,7 @@ class TestJfrogCIIntegration:
         
         # Fetch build info for Cyberint project
         cyberint_project = PRODUCT_JFROG_PROJECT["Cyberint"]
-        build_data = jfrog_client.fetch_build_info(cyberint_project)
+        build_data = jfrog_client.fetch_all_project_builds(cyberint_project)
         
         # Verify we got data
         assert isinstance(build_data, dict), "Should return a dictionary"

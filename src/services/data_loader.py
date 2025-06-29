@@ -33,12 +33,12 @@ class CompassClient:
         
         logger.info("CompassClient initialized")
     
-    def test_connection(self, scm_type: str = 'bitbucket-onprem', organization_id: str = '2') -> bool:
+    def test_connection(self, type: str = 'bitbucket_server', organization_id: str = '2') -> bool:
         """
         Test connection to Compass API
         
         Args:
-            scm_type (str): SCM type to test with (default: bitbucket-onprem for Cyberint)
+            type (str): Repository type to test with (default: bitbucket_server for Cyberint)
             organization_id (str): Organization ID to test with (default: 2 for Cyberint)
         
         Returns:
@@ -49,7 +49,7 @@ class CompassClient:
             response = requests.get(
                 f"{self.base_url}/repositories",
                 headers=self.headers,
-                params={'type': scm_type, 'organization_id': organization_id, 'limit': 1},
+                params={'type': type, 'organization_id': organization_id, 'limit': 1},
                 timeout=10
             )
             success = response.status_code == 200
@@ -59,19 +59,19 @@ class CompassClient:
             logger.error("Compass API connection test failed: %s", str(e))
             return False
     
-    def fetch_repositories(self, scm_type: str, organization_id: str) -> List[Dict]:
+    def fetch_repositories(self, type: str, organization_id: str) -> List[Dict]:
         """
         Fetch repositories from Compass API with pagination support
         
         Args:
-            scm_type (str): SCM type (github, gitlab, bitbucket-onprem, etc.)
+            type (str): Repository type (github, gitlab, bitbucket_server, sonarqube, etc.)
             organization_id (str): Organization ID
             
         Returns:
             List[Dict]: List of repository data
         """
         try:
-            logger.info("Fetching repositories for type: %s, org: %s", scm_type, organization_id)
+            logger.info("Fetching repositories for type: %s, org: %s", type, organization_id)
             
             # Build the API endpoint
             url = f"{self.base_url}/repositories"
@@ -82,7 +82,7 @@ class CompassClient:
             while True:
                 # Parameters for the API call
                 params = {
-                    'type': scm_type,
+                    'type': type,
                     'organization_id': organization_id,
                     'limit': limit,
                     'page': page
@@ -131,34 +131,73 @@ class CompassClient:
             logger.error("Unexpected error fetching repositories: %s", str(e))
             return []
     
-    def fetch_vulnerabilities(self, repository_ids: List[str]) -> Dict:
+    def fetch_jfrog_vulnerabilities(self, org_id: str) -> Dict:
         """
-        Fetch vulnerabilities for repositories
+        Fetch JFrog vulnerabilities for an organization
         
         Args:
-            repository_ids (List[str]): List of repository IDs
+            org_id (str): Organization ID
             
         Returns:
-            Dict: Vulnerability data mapped by repository ID
+            Dict: Vulnerability data mapped by artifact key
         """
-        # TODO: Implement vulnerability fetching
-        logger.info(f"Fetching vulnerabilities for {len(repository_ids)} repositories")
-        return {}
+        try:
+            url = f"{self.base_url}/remediation/jfrog-vulnerabilities"
+            params = {'organization_id': org_id}
+            
+            logger.info(f"Fetching JFrog vulnerabilities for org {org_id}")
+            
+            response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"Successfully fetched JFrog vulnerabilities: {len(data)} artifacts")
+                return data
+            else:
+                logger.error("JFrog vulnerabilities API request failed with status %d: %s", 
+                           response.status_code, response.text)
+                return {}
+                
+        except requests.exceptions.RequestException as e:
+            logger.error("Error fetching JFrog vulnerabilities: %s", str(e))
+            return {}
+        except Exception as e:
+            logger.error("Unexpected error fetching JFrog vulnerabilities: %s", str(e))
+            return {}
     
-    def fetch_ci_status(self, repository_ids: List[str]) -> Dict:
+    def fetch_sonarqube_issues(self, org_id: str) -> Dict:
         """
-        Fetch CI status for repositories
+        Fetch SonarQube issues/vulnerabilities for an organization
         
         Args:
-            repository_ids (List[str]): List of repository IDs
+            org_id (str): Organization ID
             
         Returns:
-            Dict: CI status data mapped by repository ID
+            Dict: Issues data mapped by project key
         """
-        # TODO: Implement CI status fetching
-        logger.info(f"Fetching CI status for {len(repository_ids)} repositories")
-        return {}
-
+        try:
+            url = f"{self.base_url}/remediation/sonarqube-issues"
+            params = {'organization_id': org_id}
+            
+            logger.info(f"Fetching SonarQube issues for org {org_id}")
+            
+            response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"Successfully fetched SonarQube issues: {len(data)} projects")
+                return data
+            else:
+                logger.error("SonarQube issues API request failed with status %d: %s", 
+                           response.status_code, response.text)
+                return {}
+                
+        except requests.exceptions.RequestException as e:
+            logger.error("Error fetching SonarQube issues: %s", str(e))
+            return {}
+        except Exception as e:
+            logger.error("Unexpected error fetching SonarQube issues: %s", str(e))
+            return {}
 
 class JfrogClient:
     """
@@ -215,9 +254,9 @@ class JfrogClient:
             logger.error("JFrog API connection test failed: %s", str(e))
             return False
     
-    def fetch_build_info(self, project: str) -> dict:
+    def fetch_all_project_builds(self, project: str) -> dict:
         """
-        Fetch build information from JFrog API for a project
+        Fetch all project builds information from JFrog API for a project
         Returns the raw JSON response for processing by the caller
         
         Args:
@@ -312,8 +351,6 @@ class DataLoader:
             sonar_url (str, optional): Sonar API base URL
         """
         self.compass_client = CompassClient(compass_token, compass_url)
-        
-        # Initialize optional clients
         self.jfrog_client = JfrogClient(jfrog_token) if jfrog_token else None
         self.sonar_client = SonarClient(sonar_token, sonar_url) if sonar_token and sonar_url else None
         
@@ -339,46 +376,26 @@ class DataLoader:
         logger.info(f"API connection test results: {results}")
         return results
     
-    def load_repositories(self, scm_type: str, organization_id: str) -> List[Dict]:
+    def load_repositories(self, type: str, organization_id: str) -> List[Dict]:
         """
-        Load all repository data for a product
+        Load repository data from Compass API
         
         Args:
-            scm_type (str): SCM type from CONSTANTS
+            type (str): Repository type from CONSTANTS (SCM types or sonarqube)
             organization_id (str): Organization ID from CONSTANTS
             
         Returns:
-            List[Dict]: Repository data with all associated information
+            List[Dict]: Repository data from Compass API
         """
-        logger.info(f"Loading repositories for {scm_type}, org: {organization_id}")
-        
-        # Test connection first
-        if not self.compass_client.test_connection():
-            logger.error("Compass API connection failed")
-            return []
+        logger.info(f"Loading repositories for type: {type}, org: {organization_id}")
         
         try:
-            # Fetch repository list
-            repos = self.compass_client.fetch_repositories(scm_type, organization_id)
+            # Fetch repository list from Compass API
+            repos = self.compass_client.fetch_repositories(type, organization_id)
             
             if not repos:
                 logger.warning("No repositories found")
                 return []
-            
-            # Extract repository IDs for additional data fetching
-            repo_ids = [repo.get("id") for repo in repos if repo.get("id")]
-            
-            # Fetch additional data (vulnerabilities, CI status, etc.)
-            # This will be implemented as we add more API integrations
-            vulnerabilities = self.compass_client.fetch_vulnerabilities(repo_ids)
-            ci_status = self.compass_client.fetch_ci_status(repo_ids)
-            
-            # Combine all data (parsing logic will be added later)
-            for repo in repos:
-                repo_id = repo.get("id")
-                if repo_id:
-                    repo["vulnerabilities"] = vulnerabilities.get(repo_id, {})
-                    repo["ci_status"] = ci_status.get(repo_id, {})
             
             logger.info(f"Successfully loaded {len(repos)} repositories")
             return repos

@@ -1,0 +1,22 @@
+{
+  "docker://staging/scoring-manager:5f0b0100d1cd1d227d44d6ed35cf7953f062e27a": {
+    "vulnerabilities": {
+      "critical": 2,
+      "high": 5,
+      "medium": 12,
+      "low": 8,
+      "unknown": 1
+    },
+    "updated_at": "2025-06-25T14:30:15.123456"
+  },
+  "docker://staging/exploitability-scan-manager:a5a43f2f01bcca5037048072f2a548dc93e3ee1b": {
+    "vulnerabilities": {
+      "critical": 0,
+      "high": 3,
+      "medium": 7,
+      "low": 15,
+      "unknown": 0
+    },
+    "updated_at": "2025-06-25T14:25:42.987654"
+  }
+}

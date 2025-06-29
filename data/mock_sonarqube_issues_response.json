@@ -1,0 +1,194 @@
+{
+  "project-frontend-dashboard": {
+    "VULNERABILITY": {
+      "issues": {
+        "BLOCKER": 2,
+        "CRITICAL": 5,
+        "MAJOR": 12,
+        "MINOR": 28,
+        "INFO": 15
+      },
+      "updated_at": "2025-06-25T14:32:18.456789"
+    },
+    "BUG": {
+      "issues": {
+        "BLOCKER": 1,
+        "CRITICAL": 8,
+        "MAJOR": 23,
+        "MINOR": 45,
+        "INFO": 12
+      },
+      "updated_at": "2025-06-25T14:32:18.456789"
+    },
+    "CODE_SMELL": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 3,
+        "MAJOR": 67,
+        "MINOR": 134,
+        "INFO": 89
+      },
+      "updated_at": "2025-06-25T14:32:18.456789"
+    },
+    "SECURITY_HOTSPOT": {
+      "issues": {
+        "HIGH": 4,
+        "MEDIUM": 12,
+        "LOW": 18
+      },
+      "updated_at": "2025-06-25T14:32:18.456789"
+    }
+  },
+  "project-backend-api": {
+    "VULNERABILITY": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 2,
+        "MAJOR": 8,
+        "MINOR": 16,
+        "INFO": 9
+      },
+      "updated_at": "2025-06-25T14:28:45.123456"
+    },
+    "BUG": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 4,
+        "MAJOR": 15,
+        "MINOR": 32,
+        "INFO": 8
+      },
+      "updated_at": "2025-06-25T14:28:45.123456"
+    },
+    "CODE_SMELL": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 1,
+        "MAJOR": 45,
+        "MINOR": 98,
+        "INFO": 76
+      },
+      "updated_at": "2025-06-25T14:28:45.123456"
+    },
+    "SECURITY_HOTSPOT": {
+      "issues": {
+        "HIGH": 2,
+        "MEDIUM": 7,
+        "LOW": 11
+      },
+      "updated_at": "2025-06-25T14:28:45.123456"
+    }
+  },
+  "project-mobile-app": {
+    "VULNERABILITY": {
+      "issues": {
+        "BLOCKER": 1,
+        "CRITICAL": 3,
+        "MAJOR": 6,
+        "MINOR": 14,
+        "INFO": 7
+      },
+      "updated_at": "2025-06-25T14:25:12.789012"
+    },
+    "BUG": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 2,
+        "MAJOR": 11,
+        "MINOR": 25,
+        "INFO": 6
+      },
+      "updated_at": "2025-06-25T14:25:12.789012"
+    },
+    "CODE_SMELL": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 0,
+        "MAJOR": 28,
+        "MINOR": 67,
+        "INFO": 45
+      },
+      "updated_at": "2025-06-25T14:25:12.789012"
+    }
+  },
+  "project-data-analytics": {
+    "VULNERABILITY": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 1,
+        "MAJOR": 4,
+        "MINOR": 9,
+        "INFO": 5
+      },
+      "updated_at": "2025-06-25T14:20:33.345678"
+    },
+    "BUG": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 1,
+        "MAJOR": 7,
+        "MINOR": 18,
+        "INFO": 4
+      },
+      "updated_at": "2025-06-25T14:20:33.345678"
+    },
+    "CODE_SMELL": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 2,
+        "MAJOR": 34,
+        "MINOR": 78,
+        "INFO": 52
+      },
+      "updated_at": "2025-06-25T14:20:33.345678"
+    },
+    "SECURITY_HOTSPOT": {
+      "issues": {
+        "HIGH": 1,
+        "MEDIUM": 5,
+        "LOW": 8
+      },
+      "updated_at": "2025-06-25T14:20:33.345678"
+    }
+  },
+  "project-microservice-auth": {
+    "VULNERABILITY": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 0,
+        "MAJOR": 2,
+        "MINOR": 5,
+        "INFO": 3
+      },
+      "updated_at": "2025-06-25T14:15:55.567890"
+    },
+    "BUG": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 1,
+        "MAJOR": 4,
+        "MINOR": 12,
+        "INFO": 2
+      },
+      "updated_at": "2025-06-25T14:15:55.567890"
+    },
+    "CODE_SMELL": {
+      "issues": {
+        "BLOCKER": 0,
+        "CRITICAL": 0,
+        "MAJOR": 18,
+        "MINOR": 42,
+        "INFO": 29
+      },
+      "updated_at": "2025-06-25T14:15:55.567890"
+    },
+    "SECURITY_HOTSPOT": {
+      "issues": {
+        "HIGH": 3,
+        "MEDIUM": 6,
+        "LOW": 4
+      },
+      "updated_at": "2025-06-25T14:15:55.567890"
+    }
+  }
+}

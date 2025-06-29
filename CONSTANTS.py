@@ -73,3 +73,14 @@ PRODUCT_JFROG_PROJECT = {
 
 # JFrog API Configuration
 JFROG_BASE_URL = "https://cpart.jfrog.io"
+
+# Product-Sonar Prefix Mapping
+PRODUCT_SONAR_PREFIX = {
+    "Datatube": "datatube-",
+    "Policy Insights": "policyinsights-", 
+    "SaaS": "saas-",
+    "Cyberint": "cyberint-",
+    "Avanan": "avanan-",
+    "SASE": "sase-",
+    "FWaaS": "fwaas-"
+}

@@ -110,6 +110,13 @@ class Product:
         Load JFrog CI data for repositories in this product
         Updates JfrogCIStatus.is_exist for matching repositories
         """
+        # TODO: Modify the logic here so it would be generic and can handle all products according to the plan.
+        # Currently this logic will retrieve partial data (not including branch) and will work on projects with naming convention only.
+        # Need to:
+        # 1. Make it work for all products, not just those with naming conventions
+        # 2. Include branch information in the CI status
+        # 3. Handle different JFrog project structures and naming patterns
+        # 4. Make the matching logic more robust and configurable per product
         try:
             # Import constants
             try:
@@ -137,7 +144,7 @@ class Product:
             jfrog_client = JfrogClient(jfrog_token)
             
             # Fetch build information (raw JSON)
-            build_data = jfrog_client.fetch_build_info(jfrog_project)
+            build_data = jfrog_client.fetch_all_project_builds(jfrog_project)
             
             # Process the JSON to extract build names
             build_names_set = set()
@@ -175,18 +182,287 @@ class Product:
     def _load_sonar_ci_data(self):
         """
         Load Sonar CI data for repositories in this product
-        Updates SonarCIStatus.is_exist for matching repositories
-        
-        NOTE: This is a placeholder method for future implementation
-        The actual Sonar API integration will be implemented later
+        Updates SonarCIStatus.is_exist and project_key for matching repositories
         """
-        logger.info("Sonar CI data loading not implemented yet for product '%s'", self.name)
-        # Future implementation will include:
-        # 1. Get Sonar project configuration from constants
-        # 2. Initialize Sonar client with credentials
-        # 3. Fetch project information from Sonar API
-        # 4. Create set of project names
-        # 5. Update repository SonarCIStatus.is_exist for matching repos
+        # TODO: Extend this logic to check the scanned branches for each project with Sonar API.
+        # Currently only checking if projects exist, but should also verify which branches are being scanned
+        # and update the is_main_branch_scanned field accordingly.
+        try:
+            logger.info("Loading Sonar CI data for product '%s'", self.name)
+            
+            # Fetch Sonar projects from Compass API using "sonarqube" type
+            sonar_data = self.data_loader.load_repositories("sonarqube", self.organization_id)
+            
+            if not sonar_data:
+                logger.info("No Sonar projects found for product '%s'", self.name)
+                return
+            
+            # Extract project keys and detect prefix
+            project_keys = []
+            repo_names_set = set()
+            prefix = ""
+            
+            for project in sonar_data:
+                project_key = project.get('project_key', '')
+                if project_key:
+                    project_keys.append(project_key)
+            
+            if not project_keys:
+                logger.warning("No project keys found in Sonar data")
+                return
+            
+            # Detect prefix from first project key (format: "text-")
+            first_project_key = project_keys[0]
+            if '-' in first_project_key:
+                prefix = first_project_key.split('-')[0] + '-'
+                logger.info("Detected Sonar project key prefix: '%s'", prefix)
+            else:
+                logger.warning("Could not detect prefix from project key: %s", first_project_key)
+                return
+            
+            # Extract repo names (remove prefix from project keys)
+            for project_key in project_keys:
+                if project_key.startswith(prefix):
+                    repo_name = project_key[len(prefix):]  # Remove prefix
+                    if repo_name:
+                        repo_names_set.add(repo_name)
+            
+            logger.info("Found %d Sonar projects for product '%s' with prefix '%s'", 
+                       len(repo_names_set), self.name, prefix)
+            
+            # Update repository CI status
+            updated_count = 0
+            for repo in self.repos:
+                # Ensure CI status is initialized
+                if repo.ci_status is None:
+                    from .ci_status import CIStatus
+                    repo.update_ci_status(CIStatus())
+                
+                if repo.scm_info and repo.scm_info.repo_name:
+                    if repo.scm_info.repo_name in repo_names_set:
+                        # Create full project key (prefix + repo name)
+                        full_project_key = prefix + repo.scm_info.repo_name
+                        # Update Sonar CI status using setter method
+                        repo.ci_status.sonar_status.set_exists(True, full_project_key)
+                        updated_count += 1
+                        logger.debug("Updated Sonar CI status for repo '%s' with project_key '%s'", 
+                                   repo.scm_info.repo_name, full_project_key)
+            
+            logger.info("Updated Sonar CI status for %d/%d repositories in product '%s'", 
+                       updated_count, len(self.repos), self.name)
+            
+        except Exception as e:
+            logger.error("Error loading Sonar CI data for product '%s': %s", self.name, str(e))
+
+    def load_vulnerabilities(self):
+        """
+        Load vulnerability data for repositories in this product
+        Updates Vulnerabilities objects for matching repositories
+        """
+        logger.info("Loading vulnerability data for product '%s'", self.name)
+        
+        # Load JFrog vulnerabilities
+        self._load_jfrog_vulnerabilities()
+        
+        # Load Sonar vulnerabilities
+        self._load_sonar_vulnerabilities()
+        
+        logger.info("Vulnerability data loading completed for product '%s'", self.name)
+    
+    def _load_jfrog_vulnerabilities(self):
+        """
+        Load JFrog vulnerability data for repositories in this product
+        Updates DependenciesVulnerabilities objects for matching repositories
+        """
+        try:
+            # Initialize CompassClient
+            from src.services.data_loader import CompassClient
+            compass_token = os.getenv('COMPASS_ACCESS_TOKEN', '')
+            compass_url = os.getenv('COMPASS_BASE_URL', '')
+            
+            if not compass_token or not compass_url:
+                logger.warning("Compass credentials not found, skipping JFrog vulnerability loading")
+                return
+            
+            compass_client = CompassClient(compass_token, compass_url)
+            
+            # Fetch JFrog vulnerabilities for this organization
+            jfrog_vulnerabilities = compass_client.fetch_jfrog_vulnerabilities(self.organization_id)
+            
+            if not jfrog_vulnerabilities:
+                logger.info("No JFrog vulnerability data returned for organization '%s'", self.organization_id)
+                return
+            
+            updated_count = 0
+            
+            # Process vulnerability data
+            for artifact_key, vuln_data in jfrog_vulnerabilities.items():
+                # Extract repository name from artifact key
+                from src.models.vulnerabilities import DeployedArtifact
+                repo_name = DeployedArtifact.extract_repo_name_from_artifact_key(artifact_key)
+                
+                # Find matching repository
+                matching_repo = None
+                for repo in self.repos:
+                    if repo.get_repository_name() == repo_name:
+                        matching_repo = repo
+                        break
+                
+                if matching_repo:
+                    # Ensure repository has vulnerability object initialized
+                    if matching_repo.vulnerabilities is None:
+                        from .vulnerabilities import Vulnerabilities
+                        matching_repo.vulnerabilities = Vulnerabilities()
+                    
+                    # Parse vulnerability counts (including unknown)
+                    vuln_counts = vuln_data.get('vulnerabilities', {})
+                    critical = vuln_counts.get('critical', 0)
+                    high = vuln_counts.get('high', 0)
+                    medium = vuln_counts.get('medium', 0)
+                    low = vuln_counts.get('low', 0)
+                    unknown = vuln_counts.get('unknown', 0)  # Include unknown count
+                    
+                    # Extract timestamps
+                    created_at = vuln_data.get('created_at')
+                    updated_at = vuln_data.get('updated_at')
+                    
+                    # Create DeployedArtifact object (keep unknown count separate)
+                    artifact = DeployedArtifact(
+                        artifact_key=artifact_key,
+                        repo_name=repo_name,
+                        critical_count=critical,
+                        high_count=high,
+                        medium_count=medium,
+                        low_count=low,
+                        unknown_count=unknown,  # Keep unknown separate
+                        artifact_type=self._extract_artifact_type(artifact_key),
+                        created_at=created_at,
+                        updated_at=updated_at
+                    )
+                    
+                    # Add artifact to repository's dependencies vulnerabilities
+                    matching_repo.vulnerabilities.dependencies_vulns.add_artifact(artifact)
+                    updated_count += 1
+                    
+                    logger.debug("Added JFrog vulnerability data for repo '%s': %s", 
+                               repo_name, artifact.get_severity_breakdown())
+            
+            logger.info("Updated JFrog vulnerability data for %d artifacts in product '%s'", 
+                       updated_count, self.name)
+            
+        except Exception as e:
+            logger.error("Error loading JFrog vulnerability data for product '%s': %s", self.name, str(e))
+    
+    def _load_sonar_vulnerabilities(self):
+        """
+        Load SonarQube vulnerability data for repositories in this product
+        Updates SecretsVulnerabilities objects for matching repositories
+        """
+        try:
+            # Initialize CompassClient
+            from src.services.data_loader import CompassClient
+            compass_token = os.getenv('COMPASS_ACCESS_TOKEN', '')
+            compass_url = os.getenv('COMPASS_BASE_URL', '')
+            
+            if not compass_token or not compass_url:
+                logger.warning("Compass credentials not found, skipping Sonar vulnerability loading")
+                return
+            
+            compass_client = CompassClient(compass_token, compass_url)
+            
+            # Fetch SonarQube issues for this organization
+            sonar_issues = compass_client.fetch_sonarqube_issues(self.organization_id)
+            
+            if not sonar_issues:
+                logger.info("No SonarQube issues data returned for organization '%s'", self.organization_id)
+                return
+            
+            updated_count = 0
+            
+            # Import constants
+            try:
+                from CONSTANTS import PRODUCT_SONAR_PREFIX
+            except ImportError:
+                import sys
+                sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+                from CONSTANTS import PRODUCT_SONAR_PREFIX
+            
+            # Get Sonar prefix for this product
+            sonar_prefix = PRODUCT_SONAR_PREFIX.get(self.name, "")
+            
+            # Process SonarQube issues data
+            for project_key, issues_data in sonar_issues.items():
+                # Extract repository name from project key with improved prefix handling
+                if sonar_prefix and project_key.startswith(sonar_prefix):
+                    repo_name = project_key[len(sonar_prefix):]
+                    # Handle case where separator is included in prefix
+                    if repo_name.startswith('-'):
+                        repo_name = repo_name[1:]
+                else:
+                    # No prefix or prefix doesn't match, use project key as-is
+                    repo_name = project_key
+                
+                # Find matching repository
+                matching_repo = None
+                for repo in self.repos:
+                    if repo.get_repository_name() == repo_name:
+                        matching_repo = repo
+                        break
+                
+                if matching_repo:
+                    # Process all issue types dynamically - vulnerability and security hotspot issues  
+                    vulnerability_issues = issues_data.get('VULNERABILITY', {}).get('issues', {})
+                    
+                    # Initialize counters
+                    critical_count = 0
+                    high_count = 0
+                    medium_count = 0
+                    low_count = 0
+                    
+                    # Map Sonar severities to our categories for VULNERABILITY issues
+                    # VULNERABILITY: BLOCKER -> critical, CRITICAL -> critical, MAJOR -> high, MINOR -> medium, INFO -> low
+                    critical_count += vulnerability_issues.get('BLOCKER', 0)
+                    critical_count += vulnerability_issues.get('CRITICAL', 0)
+                    high_count += vulnerability_issues.get('MAJOR', 0)
+                    medium_count += vulnerability_issues.get('MINOR', 0)
+                    low_count += vulnerability_issues.get('INFO', 0)
+                    
+                    # Update repository's secrets vulnerabilities
+                    matching_repo.vulnerabilities.secrets_vulns.critical_count += critical_count
+                    matching_repo.vulnerabilities.secrets_vulns.high_count += high_count
+                    matching_repo.vulnerabilities.secrets_vulns.medium_count += medium_count
+                    matching_repo.vulnerabilities.secrets_vulns.low_count += low_count
+                    
+                    updated_count += 1
+                    
+                    logger.debug("Added Sonar vulnerability data for repo '%s': C=%d, H=%d, M=%d, L=%d", 
+                               repo_name, critical_count, high_count, medium_count, low_count)
+            
+            logger.info("Updated Sonar vulnerability data for %d repositories in product '%s'", 
+                       updated_count, self.name)
+            
+        except Exception as e:
+            logger.error("Error loading Sonar vulnerability data for product '%s': %s", self.name, str(e))
+    
+    def _extract_artifact_type(self, artifact_key: str) -> str:
+        """
+        Extract artifact type from artifact key
+        
+        Args:
+            artifact_key (str): Full artifact key
+            
+        Returns:
+            str: Artifact type (docker, npm, maven, etc.)
+        """
+        try:
+            # Extract type before first :// if present
+            if '://' in artifact_key:
+                type_part = artifact_key.split('://')[0]
+                return type_part.lower()
+            else:
+                return 'unknown'
+        except Exception:
+            return 'unknown'
 
     def get_repos_count(self) -> int:
         """

@@ -39,6 +39,13 @@ class SonarCIStatus:
         """Check if scanning is active on main branch"""
         return self.is_configured() and self.is_main_branch_scanned
     
+    def set_exists(self, exists: bool, project_key: Optional[str] = None):
+        """Set Sonar CI existence status and project key"""
+        self.is_exist = exists
+        if project_key:
+            self.project_key = project_key
+        logger.debug("SonarCIStatus.is_exist updated to: %s, project_key: %s", exists, project_key)
+    
     def __str__(self) -> str:
         """String representation of Sonar CI status"""
         return f"SonarCI(exists={self.is_exist}, scanned={self.is_main_branch_scanned})"
