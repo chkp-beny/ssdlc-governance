@@ -1,6 +1,6 @@
 """
 Vulnerability classes - Vulnerability data aggregation
-Contains SecretsVulnerabilities and DependenciesVulnerabilities objects
+Contains CodeVulnerabilities and DependenciesVulnerabilities objects
 """
 
 from typing import Optional, List
@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 class DeployedArtifact:
     """
-    Represents a deployed artifact with vulnerability information
+    Represents a deployed artifact with vulnerability counts
+    Contains artifact metadata and vulnerability severity breakdown
     """
     
     def __init__(self, artifact_key: str, repo_name: str, critical_count: int = 0, 
@@ -48,9 +49,22 @@ class DeployedArtifact:
         self.build_number = build_number
         self.created_at = created_at
         self.updated_at = updated_at
+        self.is_latest = self._check_if_latest(artifact_key)
         
-        logger.debug("DeployedArtifact created: %s (%s) - C=%d, H=%d, M=%d, L=%d, U=%d",
-                    artifact_key, repo_name, critical_count, high_count, medium_count, low_count, unknown_count)
+        logger.debug("DeployedArtifact created: %s (%s) - C=%d, H=%d, M=%d, L=%d, U=%d, is_latest=%s",
+                    artifact_key, repo_name, critical_count, high_count, medium_count, low_count, unknown_count, self.is_latest)
+    
+    def _check_if_latest(self, artifact_key: str) -> bool:
+        """
+        Check if the artifact has 'latest' as a suffix
+        
+        Args:
+            artifact_key (str): Full artifact key
+            
+        Returns:
+            bool: True if artifact has 'latest' suffix
+        """
+        return artifact_key.endswith(':latest')
     
     def get_total_count(self) -> int:
         """Get total vulnerability count for this artifact"""
@@ -142,12 +156,14 @@ class DeployedArtifact:
                 f"repo_name='{self.repo_name}', critical={self.critical_count}, "
                 f"high={self.high_count}, medium={self.medium_count}, "
                 f"low={self.low_count}, unknown={self.unknown_count}, "
+                f"is_latest={self.is_latest}, "
                 f"created_at='{self.created_at}', updated_at='{self.updated_at}')")
 
 
 class DependenciesVulnerabilities:
     """
     Third-party dependency vulnerabilities
+    Counters reflect either the 'latest' artifact or the artifact with most vulnerabilities
     """
     
     def __init__(self, critical_count: int = 0, high_count: int = 0, 
@@ -171,22 +187,51 @@ class DependenciesVulnerabilities:
         self.unknown_count = unknown_count
         self.artifacts = artifacts or []
         
+        # Update counters based on artifacts if provided
+        if self.artifacts:
+            self._update_counters_from_artifacts()
+        
         logger.debug("DependenciesVulnerabilities created: C=%d, H=%d, M=%d, L=%d, U=%d, artifacts=%d",
-                    critical_count, high_count, medium_count, low_count, unknown_count, len(self.artifacts))
+                    self.critical_count, self.high_count, self.medium_count, self.low_count, self.unknown_count, len(self.artifacts))
     
     def add_artifact(self, artifact: DeployedArtifact):
-        """Add a deployed artifact to the list"""
+        """Add a deployed artifact to the list and update counters"""
         self.artifacts.append(artifact)
-        # Update aggregated counts
-        self.critical_count += artifact.critical_count
-        self.high_count += artifact.high_count
-        self.medium_count += artifact.medium_count
-        self.low_count += artifact.low_count
-        self.unknown_count += artifact.unknown_count
+        # Update counters based on the new artifact list
+        self._update_counters_from_artifacts()
         
         logger.debug("Added artifact %s, new totals: C=%d, H=%d, M=%d, L=%d, U=%d",
                     artifact.repo_name, self.critical_count, self.high_count, 
                     self.medium_count, self.low_count, self.unknown_count)
+    
+    def _update_counters_from_artifacts(self):
+        """
+        Update counters based on artifacts list.
+        Priority: 'latest' artifact > artifact with most vulnerabilities
+        """
+        if not self.artifacts:
+            self.critical_count = self.high_count = self.medium_count = self.low_count = self.unknown_count = 0
+            return
+        
+        # Look for 'latest' artifacts first
+        latest_artifacts = [artifact for artifact in self.artifacts if artifact.is_latest]
+        
+        if latest_artifacts:
+            # Use the first 'latest' artifact found
+            chosen_artifact = latest_artifacts[0]
+            logger.debug("Using 'latest' artifact for counters: %s", chosen_artifact.artifact_key)
+        else:
+            # Choose the artifact with the most total vulnerabilities
+            chosen_artifact = max(self.artifacts, key=lambda x: x.get_total_count())
+            logger.debug("Using artifact with most vulnerabilities for counters: %s (total=%d)", 
+                        chosen_artifact.artifact_key, chosen_artifact.get_total_count())
+        
+        # Update counters from the chosen artifact
+        self.critical_count = chosen_artifact.critical_count
+        self.high_count = chosen_artifact.high_count
+        self.medium_count = chosen_artifact.medium_count 
+        self.low_count = chosen_artifact.low_count
+        self.unknown_count = chosen_artifact.unknown_count
     
     def get_artifacts_by_repo_name(self, repo_name: str) -> List[DeployedArtifact]:
         """Get all artifacts for a specific repository"""
@@ -223,59 +268,150 @@ class DependenciesVulnerabilities:
                 f"low={self.low_count}, unknown={self.unknown_count}, artifacts_count={len(self.artifacts)})")
 
 
-class SecretsVulnerabilities:
+class CodeIssues:
     """
-    Exposed secrets and credentials vulnerabilities
+    Code quality issues from SonarQube analysis
+    Stores all types of issues: VULNERABILITY, CODE_SMELL, BUG, etc.
     """
     
-    def __init__(self, critical_count: int = 0, high_count: int = 0, 
-                 medium_count: int = 0, low_count: int = 0):
+    def __init__(self, issues_by_type: Optional[dict] = None, secrets_count: int = 0):
         """
-        Initialize secrets vulnerabilities
+        Initialize code issues with flexible type-based storage
         
         Args:
-            critical_count (int): Number of critical secret exposures
-            high_count (int): Number of high severity secret exposures
-            medium_count (int): Number of medium severity secret exposures
-            low_count (int): Number of low severity secret exposures
+            issues_by_type (Optional[dict]): Dictionary mapping issue types to severity counts
+                Example: {
+                    "VULNERABILITY": {"CRITICAL": 3, "MAJOR": 2},
+                    "CODE_SMELL": {"BLOCKER": 5, "CRITICAL": 22, "INFO": 25},
+                    "BUG": {"MAJOR": 1, "MINOR": 3}
+                }
+            secrets_count (int): Number of secrets found in the code
         """
-        self.critical_count = critical_count
-        self.high_count = high_count
-        self.medium_count = medium_count
-        self.low_count = low_count
+        self.issues_by_type = issues_by_type or {}
+        self.secrets_count = secrets_count
         
-        logger.debug("SecretsVulnerabilities created: C=%d, H=%d, M=%d, L=%d",
-                    critical_count, high_count, medium_count, low_count)
+        logger.debug("CodeIssues created with %d issue types: %s, secrets_count: %d", 
+                    len(self.issues_by_type), list(self.issues_by_type.keys()), secrets_count)
+    
+    def add_issue_type(self, issue_type: str, severity_counts: dict):
+        """
+        Add or update an issue type with its severity counts
+        
+        Args:
+            issue_type (str): Type of issue (VULNERABILITY, CODE_SMELL, BUG, etc.)
+            severity_counts (dict): Dictionary of severity to count mapping
+        """
+        self.issues_by_type[issue_type] = severity_counts
+        logger.debug("Added issue type '%s' with counts: %s", issue_type, severity_counts)
+    
+    def get_issue_types(self) -> List[str]:
+        """Get list of all issue types present"""
+        return list(self.issues_by_type.keys())
+    
+    def get_counts_for_type(self, issue_type: str) -> dict:
+        """Get severity counts for a specific issue type"""
+        return self.issues_by_type.get(issue_type, {})
+    
+    def get_total_count_for_type(self, issue_type: str) -> int:
+        """Get total count for a specific issue type"""
+        counts = self.get_counts_for_type(issue_type)
+        return sum(counts.values())
+    
+    def get_critical_count_for_type(self, issue_type: str) -> int:
+        """Get critical/blocker count for a specific issue type"""
+        counts = self.get_counts_for_type(issue_type)
+        return counts.get('CRITICAL', 0) + counts.get('BLOCKER', 0)
     
     def get_total_count(self) -> int:
-        """Get total secrets vulnerability count"""
-        return self.critical_count + self.high_count + self.medium_count + self.low_count
+        """Get total count across all issue types"""
+        total = 0
+        for type_counts in self.issues_by_type.values():
+            total += sum(type_counts.values())
+        return total
     
-    def get_high_and_critical_count(self) -> int:
-        """Get count of high and critical secret exposures"""
-        return self.critical_count + self.high_count
+    def get_critical_count(self) -> int:
+        """Get total critical/blocker count across all issue types"""
+        total = 0
+        for type_counts in self.issues_by_type.values():
+            total += type_counts.get('CRITICAL', 0) + type_counts.get('BLOCKER', 0)
+        return total
     
-    def has_critical_secrets(self) -> bool:
-        """Check if there are critical secret exposures"""
-        return self.critical_count > 0
+    def get_vulnerability_count(self) -> int:
+        """Get total vulnerability count (for backward compatibility)"""
+        return self.get_total_count_for_type('VULNERABILITY')
     
-    def has_any_secrets(self) -> bool:
-        """Check if there are any secret exposures"""
+    def get_critical_vulnerability_count(self) -> int:
+        """Get critical vulnerability count (for backward compatibility)"""
+        return self.get_critical_count_for_type('VULNERABILITY')
+    
+    def get_secrets_count(self) -> int:
+        """
+        Get the count of secrets found in the code
+        
+        Returns:
+            int: Number of secrets
+        """
+        return self.secrets_count
+    
+    def has_issues(self) -> bool:
+        """Check if there are any issues"""
         return self.get_total_count() > 0
     
+    def has_critical_issues(self) -> bool:
+        """Check if there are any critical/blocker issues"""
+        return self.get_critical_count() > 0
+    
+    def has_vulnerabilities(self) -> bool:
+        """Check if there are vulnerability-type issues"""
+        return self.get_vulnerability_count() > 0
+    
+    def has_critical_vulnerabilities(self) -> bool:
+        """Check if there are critical vulnerabilities"""
+        return self.get_critical_vulnerability_count() > 0
+    
     def get_severity_breakdown(self) -> str:
-        """Get formatted severity breakdown"""
-        return f"C:{self.critical_count}, H:{self.high_count}, M:{self.medium_count}, L:{self.low_count}"
+        """Get formatted breakdown by issue type"""
+        if not self.issues_by_type:
+            return "No issues"
+        
+        breakdown_parts = []
+        for issue_type, counts in self.issues_by_type.items():
+            count_str = ", ".join(f"{sev}:{count}" for sev, count in counts.items())
+            breakdown_parts.append(f"{issue_type}[{count_str}]")
+        
+        return "; ".join(breakdown_parts)
+    
+    # Backward compatibility properties
+    @property
+    def critical_count(self) -> int:
+        """Backward compatibility: return critical vulnerability count"""
+        return self.get_critical_vulnerability_count()
+    
+    @property
+    def high_count(self) -> int:
+        """Backward compatibility: return high vulnerability count"""
+        vuln_counts = self.get_counts_for_type('VULNERABILITY')
+        return vuln_counts.get('MAJOR', 0)
+    
+    @property
+    def medium_count(self) -> int:
+        """Backward compatibility: return medium vulnerability count"""
+        vuln_counts = self.get_counts_for_type('VULNERABILITY')
+        return vuln_counts.get('MINOR', 0)
+    
+    @property
+    def low_count(self) -> int:
+        """Backward compatibility: return low vulnerability count"""
+        vuln_counts = self.get_counts_for_type('VULNERABILITY')
+        return vuln_counts.get('INFO', 0)
     
     def __str__(self) -> str:
-        """String representation of secrets vulnerabilities"""
-        return f"SecretsVuln(total={self.get_total_count()})"
+        """String representation of code issues"""
+        return f"CodeIssues(total={self.get_total_count()}, types={len(self.issues_by_type)})"
     
     def __repr__(self) -> str:
         """Detailed string representation"""
-        return (f"SecretsVulnerabilities(critical={self.critical_count}, "
-                f"high={self.high_count}, medium={self.medium_count}, "
-                f"low={self.low_count})")
+        return f"CodeIssues(issues_by_type={self.issues_by_type})"
 
 
 class Vulnerabilities:
@@ -283,38 +419,44 @@ class Vulnerabilities:
     Vulnerability data aggregation
     """
     
-    def __init__(self, secrets_vulns: Optional[SecretsVulnerabilities] = None,
+    def __init__(self, code_issues: Optional[CodeIssues] = None,
                  dependencies_vulns: Optional[DependenciesVulnerabilities] = None):
         """
         Initialize vulnerability aggregation
         
         Args:
-            secrets_vulns (Optional[SecretsVulnerabilities]): Secrets vulnerabilities
+            code_issues (Optional[CodeIssues]): Code quality issues from SonarQube
             dependencies_vulns (Optional[DependenciesVulnerabilities]): Dependencies vulnerabilities
         """
-        self.secrets_vulns = secrets_vulns or SecretsVulnerabilities()
+        self.code_issues = code_issues or CodeIssues()
         self.dependencies_vulns = dependencies_vulns or DependenciesVulnerabilities()
         
-        logger.debug("Vulnerabilities created with secrets and dependencies data")
+        logger.debug("Vulnerabilities created with code issues and dependencies data")
+    
+    # Backward compatibility property
+    @property
+    def code_vulns(self) -> CodeIssues:
+        """Backward compatibility property for code_vulns -> code_issues"""
+        return self.code_issues
     
     def get_total_vulnerability_count(self) -> int:
         """Get total count across all vulnerability types"""
-        return (self.secrets_vulns.get_total_count() + 
+        return (self.code_issues.get_total_count() + 
                 self.dependencies_vulns.get_total_count())
     
     def get_critical_vulnerability_count(self) -> int:
         """Get total critical vulnerability count"""
-        return (self.secrets_vulns.critical_count + 
+        return (self.code_issues.critical_count + 
                 self.dependencies_vulns.critical_count)
     
     def has_critical_vulnerabilities(self) -> bool:
         """Check if there are any critical vulnerabilities"""
-        return (self.secrets_vulns.has_critical_secrets() or 
+        return (self.code_issues.has_critical_vulnerabilities() or 
                 self.dependencies_vulns.has_critical_vulnerabilities())
     
     def has_any_vulnerabilities(self) -> bool:
         """Check if there are any vulnerabilities"""
-        return (self.secrets_vulns.has_any_secrets() or 
+        return (self.code_issues.has_issues() or 
                 self.dependencies_vulns.has_any_vulnerabilities())
     
     def get_vulnerability_summary(self) -> str:
@@ -325,9 +467,9 @@ class Vulnerabilities:
     
     def get_detailed_breakdown(self) -> str:
         """Get detailed breakdown by type"""
-        secrets = self.secrets_vulns.get_severity_breakdown()
+        code = self.code_issues.get_severity_breakdown()
         deps = self.dependencies_vulns.get_severity_breakdown()
-        return f"Secrets[{secrets}], Dependencies[{deps}]"
+        return f"Code[{code}], Dependencies[{deps}]"
     
     def __str__(self) -> str:
         """String representation of vulnerabilities"""
@@ -335,5 +477,5 @@ class Vulnerabilities:
     
     def __repr__(self) -> str:
         """Detailed string representation"""
-        return (f"Vulnerabilities(secrets_vulns={repr(self.secrets_vulns)}, "
+        return (f"Vulnerabilities(code_issues={repr(self.code_issues)}, "
                 f"dependencies_vulns={repr(self.dependencies_vulns)})")

@@ -53,7 +53,7 @@
 - **Purpose**: Continuous Deployment status
 
 ### Vulnerabilities
-- **Contains**: SecretsVulnerabilities object, DependenciesVulnerabilities object
+- **Contains**: CodeVulnerabilities object, DependenciesVulnerabilities object
 - **Purpose**: Vulnerability data aggregation
 
 ### DependenciesVulnerabilities
@@ -61,7 +61,7 @@
 - **Note**: Will contain list of CVE objects with detailed vulnerability data
 - **Purpose**: Third-party dependency vulnerabilities
 
-### SecretsVulnerabilities
+### CodeVulnerabilities
 - **Fields**: critical_count, high_count, medium_count, low_count
 - **Note**: Will contain list of detailed secret finding objects
 - **Purpose**: Exposed secrets and credentials

@@ -9,6 +9,7 @@ import os
 from dotenv import load_dotenv
 from .devops import DevOps
 from .repo import Repo
+from .vulnerabilities import Vulnerabilities, CodeIssues
 
 # Load environment variables
 load_dotenv()
@@ -356,7 +357,7 @@ class Product:
     def _load_sonar_vulnerabilities(self):
         """
         Load SonarQube vulnerability data for repositories in this product
-        Updates SecretsVulnerabilities objects for matching repositories
+        Updates CodeVulnerabilities objects for matching repositories
         """
         try:
             # Initialize CompassClient
@@ -376,6 +377,10 @@ class Product:
             if not sonar_issues:
                 logger.info("No SonarQube issues data returned for organization '%s'", self.organization_id)
                 return
+            
+            # Also fetch SonarQube secrets data
+            sonar_secrets = compass_client.fetch_sonarqube_secrets(self.organization_id)
+            logger.info("Fetched SonarQube secrets data for %d projects", len(sonar_secrets))
             
             updated_count = 0
             
@@ -410,39 +415,49 @@ class Product:
                         break
                 
                 if matching_repo:
-                    # Process all issue types dynamically - vulnerability and security hotspot issues  
-                    vulnerability_issues = issues_data.get('VULNERABILITY', {}).get('issues', {})
+                    # Initialize vulnerabilities if not already initialized
+                    if matching_repo.vulnerabilities is None:
+                        matching_repo.vulnerabilities = Vulnerabilities()
                     
-                    # Initialize counters
-                    critical_count = 0
-                    high_count = 0
-                    medium_count = 0
-                    low_count = 0
+                    # Process all issue types dynamically (VULNERABILITY, CODE_SMELL, BUG, etc.)
+                    issues_by_type = {}
                     
-                    # Map Sonar severities to our categories for VULNERABILITY issues
-                    # VULNERABILITY: BLOCKER -> critical, CRITICAL -> critical, MAJOR -> high, MINOR -> medium, INFO -> low
-                    critical_count += vulnerability_issues.get('BLOCKER', 0)
-                    critical_count += vulnerability_issues.get('CRITICAL', 0)
-                    high_count += vulnerability_issues.get('MAJOR', 0)
-                    medium_count += vulnerability_issues.get('MINOR', 0)
-                    low_count += vulnerability_issues.get('INFO', 0)
+                    # Iterate through all issue types in the response
+                    for issue_type, type_data in issues_data.items():
+                        if 'issues' in type_data:
+                            severity_counts = type_data['issues']
+                            issues_by_type[issue_type] = severity_counts
+                            
+                            logger.debug("Collected '%s' issues for repo '%s': %s", 
+                                       issue_type, repo_name, severity_counts)
                     
-                    # Update repository's secrets vulnerabilities
-                    matching_repo.vulnerabilities.secrets_vulns.critical_count += critical_count
-                    matching_repo.vulnerabilities.secrets_vulns.high_count += high_count
-                    matching_repo.vulnerabilities.secrets_vulns.medium_count += medium_count
-                    matching_repo.vulnerabilities.secrets_vulns.low_count += low_count
-                    
-                    updated_count += 1
-                    
-                    logger.debug("Added Sonar vulnerability data for repo '%s': C=%d, H=%d, M=%d, L=%d", 
-                               repo_name, critical_count, high_count, medium_count, low_count)
+                    # Update the repository's code issues with all types
+                    if issues_by_type:
+                        # Check if we have secrets data for this project
+                        secrets_count = 0
+                        if sonar_secrets and project_key in sonar_secrets:
+                            secrets_data = sonar_secrets[project_key]
+                            # Extract secrets count from the response
+                            # Assuming the API returns something like {"secrets_count": 5}
+                            if isinstance(secrets_data, dict):
+                                secrets_count = secrets_data.get('secrets_count', 0)
+                            elif isinstance(secrets_data, int):
+                                secrets_count = secrets_data
+                            
+                            logger.debug("Found %d secrets for project '%s'", secrets_count, project_key)
+                        
+                        # Create or update CodeIssues with all collected issue types and secrets
+                        matching_repo.vulnerabilities.code_issues = CodeIssues(issues_by_type, secrets_count)
+                        updated_count += 1
+                        
+                        logger.debug("Updated code issues for repo '%s' with %d issue types and %d secrets: %s", 
+                                   repo_name, len(issues_by_type), secrets_count, list(issues_by_type.keys()))
             
-            logger.info("Updated Sonar vulnerability data for %d repositories in product '%s'", 
+            logger.info("Updated Sonar code issues data for %d repositories in product '%s'", 
                        updated_count, self.name)
             
         except Exception as e:
-            logger.error("Error loading Sonar vulnerability data for product '%s': %s", self.name, str(e))
+            logger.error("Error loading Sonar code issues data for product '%s': %s", self.name, str(e))
     
     def _extract_artifact_type(self, artifact_key: str) -> str:
         """

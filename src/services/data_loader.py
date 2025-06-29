@@ -142,7 +142,7 @@ class CompassClient:
             Dict: Vulnerability data mapped by artifact key
         """
         try:
-            url = f"{self.base_url}/remediation/jfrog-vulnerabilities"
+            url = f"{self.base_url}/remediation/jfrog/vulnerabilities"
             params = {'organization_id': org_id}
             
             logger.info(f"Fetching JFrog vulnerabilities for org {org_id}")
@@ -176,7 +176,7 @@ class CompassClient:
             Dict: Issues data mapped by project key
         """
         try:
-            url = f"{self.base_url}/remediation/sonarqube-issues"
+            url = f"{self.base_url}/remediation/sonarqube/issues"
             params = {'organization_id': org_id}
             
             logger.info(f"Fetching SonarQube issues for org {org_id}")
@@ -197,6 +197,40 @@ class CompassClient:
             return {}
         except Exception as e:
             logger.error("Unexpected error fetching SonarQube issues: %s", str(e))
+            return {}
+    
+    def fetch_sonarqube_secrets(self, org_id: str) -> Dict:
+        """
+        Fetch SonarQube secrets count for an organization
+        
+        Args:
+            org_id (str): Organization ID
+            
+        Returns:
+            Dict: Secrets data mapped by project key
+        """
+        try:
+            url = f"{self.base_url}/remediation/sonarqube/secrets"
+            params = {'organization_id': org_id}
+            
+            logger.info(f"Fetching SonarQube secrets for org {org_id}")
+            
+            response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"Successfully fetched SonarQube secrets: {len(data)} projects")
+                return data
+            else:
+                logger.error("SonarQube secrets API request failed with status %d: %s", 
+                           response.status_code, response.text)
+                return {}
+                
+        except requests.exceptions.RequestException as e:
+            logger.error("Error fetching SonarQube secrets: %s", str(e))
+            return {}
+        except Exception as e:
+            logger.error("Unexpected error fetching SonarQube secrets: %s", str(e))
             return {}
 
 class JfrogClient:
