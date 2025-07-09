@@ -3,7 +3,8 @@ PILLAR_PRODUCTS = {
     "Infinity": ["Datatube", "Policy Insights", "Cyberint"],
     "Quantum": ["Policy Insights"],
     "Harmony": ["SaaS", "Avanan", "SASE"],
-    "CloudGuard": ["FWaaS"]
+    "CloudGuard": ["FWaaS"],
+    "Inext": ["Inext"]
 }
 
 # Product-DevOps Mapping
@@ -46,7 +47,8 @@ PRODUCT_SCM_TYPE = {
     "Cyberint": "bitbucket_server",
     "Avanan": "github",
     "SASE": "github",
-    "FWaaS": "github"
+    "FWaaS": "github",
+    "Inext": "gitlab"
 }
 
 # Product-Organization ID Mapping - All organizations use ID 0
@@ -57,7 +59,8 @@ PRODUCT_ORGANIZATION_ID = {
     "Cyberint": "2", 
     "Avanan": "3",
     "SASE": "4",
-    "FWaaS": "0"
+    "FWaaS": "0",
+    "Inext": "5"
 }
 
 # Product-JFrog Project Mapping
@@ -68,7 +71,8 @@ PRODUCT_JFROG_PROJECT = {
     "Cyberint": "cyberint",
     "Avanan": "hec",
     "SASE": "",
-    "FWaaS": "fwaas"
+    "FWaaS": "fwaas",
+    "Inext": ""
 }
 
 # JFrog API Configuration
@@ -77,13 +81,13 @@ JFROG_BASE_URL = "https://cpart.jfrog.io"
 # Product-JFrog Token Mapping
 # Maps products to their corresponding environment variable names for JFrog tokens
 PRODUCT_JFROG_TOKEN_ENV = {
-    "Datatube": "CYBERINT_JFROG_ACCESS_TOKEN",
-    "Policy Insights": "CYBERINT_JFROG_ACCESS_TOKEN",
-    "SaaS": "CYBERINT_JFROG_ACCESS_TOKEN",
+    "Datatube": "",
+    "Policy Insights": "",
+    "SaaS": "",
     "Cyberint": "CYBERINT_JFROG_ACCESS_TOKEN",
     "Avanan": "AVANAN_JFROG_ACCESS_TOKEN",
-    "SASE": "CYBERINT_JFROG_ACCESS_TOKEN",
-    "FWaaS": "CYBERINT_JFROG_ACCESS_TOKEN"
+    "SASE": "",
+    "FWaaS": ""
 }
 
 # Product-Sonar Prefix Mapping

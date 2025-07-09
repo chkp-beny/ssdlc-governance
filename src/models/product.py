@@ -574,33 +574,46 @@ class Product:
             if repo.ci_status is None:
                 from .ci_status import CIStatus
                 repo.update_ci_status(CIStatus())
-            
+
             if repo.scm_info and repo.scm_info.repo_name:
                 repo_name = repo.scm_info.repo_name
-                
+
                 if repo_name in all_repo_matches:
                     # Find the most recent build for this repository
                     builds_for_repo = all_repo_matches[repo_name]
-                    latest_build = max(builds_for_repo, 
-                                     key=lambda b: b.get('started', ''))
-                    
+                    latest_build = max(builds_for_repo, key=lambda b: b.get('started', ''))
+
                     # Extract all build names for this repository as a set
                     build_names = {build['build_name'] for build in builds_for_repo}
-                    
-                    # Update JFrog CI status with metadata and build names
+
+                    # Build mapping method dict for this repo's builds
+                    build_name_mapping_methods = {}
+                    for build in builds_for_repo:
+                        build_name = build['build_name']
+                        match_type = build.get('match_type', 'not_mapped')
+                        # Use 'metadata' or 'longest_prefix' for clarity
+                        if match_type == 'metadata':
+                            build_name_mapping_methods[build_name] = 'source_repo'
+                        elif match_type == 'fallback':
+                            build_name_mapping_methods[build_name] = 'longest_prefix'
+                        else:
+                            build_name_mapping_methods[build_name] = 'not_mapped'
+
+                    # Update JFrog CI status with metadata, build names, and mapping methods
                     repo.ci_status.jfrog_status.set_exists(
                         True,
                         branch=latest_build.get('branch'),
                         job_url=latest_build.get('job_url'),
-                        matched_build_names=build_names
+                        matched_build_names=build_names,
+                        build_name_mapping_methods=build_name_mapping_methods
                     )
-                    
-                    # IMPORTANT: Populate build_name_to_repo_map for vulnerability matching
+
+                    # Populate build_name_to_repo_map for vulnerability matching
                     for build_name in build_names:
                         self.build_name_to_repo_map[build_name] = repo
-                    
+
                     updated_count += 1
-                    
+
                     match_type = latest_build.get('match_type', 'unknown')
                     logger.debug("Updated JFrog CI status for repo '%s' with %s match and %d build names: %s", 
                                repo_name, match_type, len(build_names), list(build_names)[:3])

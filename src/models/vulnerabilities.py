@@ -155,32 +155,22 @@ class DependenciesVulnerabilities:
     
     def _update_counters_from_artifacts(self):
         """
-        Update counters based on artifacts list.
-        Priority: 'latest' artifact > artifact with most vulnerabilities
+        Update counters based on the sum of vulnerabilities from all artifacts.
         """
         if not self.artifacts:
             self.critical_count = self.high_count = self.medium_count = self.low_count = self.unknown_count = 0
             return
+
+        # Sum vulnerabilities from all artifacts
+        self.critical_count = sum(artifact.critical_count for artifact in self.artifacts)
+        self.high_count = sum(artifact.high_count for artifact in self.artifacts)
+        self.medium_count = sum(artifact.medium_count for artifact in self.artifacts)
+        self.low_count = sum(artifact.low_count for artifact in self.artifacts)
+        self.unknown_count = sum(artifact.unknown_count for artifact in self.artifacts)
         
-        # Look for 'latest' artifacts first
-        latest_artifacts = [artifact for artifact in self.artifacts if artifact.is_latest]
-        
-        if latest_artifacts:
-            # Use the first 'latest' artifact found
-            chosen_artifact = latest_artifacts[0]
-            logger.debug("Using 'latest' artifact for counters: %s", chosen_artifact.artifact_key)
-        else:
-            # Choose the artifact with the most total vulnerabilities
-            chosen_artifact = max(self.artifacts, key=lambda x: x.get_total_count())
-            logger.debug("Using artifact with most vulnerabilities for counters: %s (total=%d)", 
-                        chosen_artifact.artifact_key, chosen_artifact.get_total_count())
-        
-        # Update counters from the chosen artifact
-        self.critical_count = chosen_artifact.critical_count
-        self.high_count = chosen_artifact.high_count
-        self.medium_count = chosen_artifact.medium_count 
-        self.low_count = chosen_artifact.low_count
-        self.unknown_count = chosen_artifact.unknown_count
+        logger.debug("Updated total counts from %d artifacts: C=%d, H=%d, M=%d, L=%d, U=%d",
+                     len(self.artifacts), self.critical_count, self.high_count,
+                     self.medium_count, self.low_count, self.unknown_count)
     
     def get_artifacts_by_repo_name(self, repo_name: str) -> List[DeployedArtifact]:
         """Get all artifacts for a specific repository"""

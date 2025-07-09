@@ -64,7 +64,8 @@ class JfrogCIStatus:
     
     def __init__(self, is_exist: bool = False, branch: Optional[str] = None, 
                  job_url: Optional[str] = None,
-                 matched_build_names: Optional[Set[str]] = None):
+                 matched_build_names: Optional[Set[str]] = None,
+                 build_name_mapping_methods: Optional[dict] = None):
         """
         Initialize JFrog CI status
         
@@ -73,11 +74,13 @@ class JfrogCIStatus:
             branch (Optional[str]): Branch being built
             job_url (Optional[str]): CI job URL
             matched_build_names (Optional[Set[str]]): Set of build names matched to this repository
+            build_name_mapping_methods (Optional[dict]): Mapping of build name to mapping method
         """
         self.is_exist = is_exist
         self.branch = branch
         self.job_url = job_url
         self.matched_build_names = matched_build_names or set()
+        self.build_name_mapping_methods = build_name_mapping_methods or {}
         
         logger.debug("JfrogCIStatus created: exists=%s", is_exist)
     
@@ -86,7 +89,8 @@ class JfrogCIStatus:
         return self.is_exist
     
     def set_exists(self, exists: bool, branch: Optional[str] = None, 
-                   job_url: Optional[str] = None, matched_build_names: Optional[Set[str]] = None):
+                   job_url: Optional[str] = None, matched_build_names: Optional[Set[str]] = None,
+                   build_name_mapping_methods: Optional[dict] = None):
         """Set JFrog CI existence status and optional metadata"""
         self.is_exist = exists
         if branch:
@@ -95,18 +99,22 @@ class JfrogCIStatus:
             self.job_url = job_url
         if matched_build_names is not None:
             self.matched_build_names = matched_build_names
-        logger.debug("JfrogCIStatus.is_exist updated to: %s, branch: %s, builds: %s", 
-                    exists, branch, len(matched_build_names) if matched_build_names else 0)
+        if build_name_mapping_methods is not None:
+            self.build_name_mapping_methods = build_name_mapping_methods
+        logger.debug("JfrogCIStatus.is_exist updated to: %s, branch: %s, builds: %s, mapping_methods: %s", 
+                    exists, branch, len(matched_build_names) if matched_build_names else 0, 
+                    len(build_name_mapping_methods) if build_name_mapping_methods else 0)
     
     def __str__(self) -> str:
         """String representation of JFrog CI status"""
-        return f"JfrogCI(exists={self.is_exist}, builds={len(self.matched_build_names)})"
+        return f"JfrogCI(exists={self.is_exist}, builds={len(self.matched_build_names)}, mapping_methods={len(self.build_name_mapping_methods)})"
     
     def __repr__(self) -> str:
         """Detailed string representation"""
         return (f"JfrogCIStatus(is_exist={self.is_exist}, "
                 f"branch='{self.branch}', "
-                f"builds_count={len(self.matched_build_names)})")
+                f"builds_count={len(self.matched_build_names)}, "
+                f"mapping_methods_count={len(self.build_name_mapping_methods)})")
 
 
 class CIStatus:
