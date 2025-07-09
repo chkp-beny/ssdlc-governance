@@ -8,10 +8,20 @@ data including CI/CD status, vulnerabilities, and security metrics.
 
 import csv
 import json
+import logging
 import os
 import sys
 from datetime import datetime
 from typing import List, Dict, Any
+
+# Configure logging to show progress messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 
 # Visualization libraries
 import pandas as pd
@@ -29,6 +39,19 @@ from CONSTANTS import (
     PILLAR_PRODUCTS, PRODUCT_DEVOPS, PRODUCT_SCM_TYPE, 
     PRODUCT_ORGANIZATION_ID
 )
+
+# Configure logging to show progress messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# Set specific logger levels for better visibility
+logging.getLogger('src.models.product').setLevel(logging.INFO)
+logging.getLogger('src.services.data_loader').setLevel(logging.INFO)
 
 
 class ProductReportGenerator:
@@ -122,19 +145,29 @@ class ProductReportGenerator:
         # Get SCM type from CONSTANTS based on product name
         scm_name = PRODUCT_SCM_TYPE.get(product_name, 'unknown')
         
+        # Find product pillar for this product
+        product_pillar = 'Unknown'
+        for pillar, products in PILLAR_PRODUCTS.items():
+            if product_name in products:
+                product_pillar = pillar
+                break
+        
         data = {
+            'product_pillar': product_pillar,
+            'product': product_name,
             'scm_name': scm_name,
             'repo_name': repo.get_repository_name(),
             'default_branch': 'No info',
             'hr_info': 'Unhandled Yet',
             'is_production': 'Unhandled Yet',
             'jfrog_ci_status': False,
+            'build_names': 'None',
             'jfrog_cd_status': 'Unhandled Yet',
-            'deployed_artifacts': '[]',
             'sonar_ci_status': False,
             'sonar_is_scanned': 'Unhandled Yet',
             'critical_dependencies_vuln': 0,
             'high_dependencies_vuln': 0,
+            'deployed_artifacts_vulnerabilities': '{}',  # Default empty JSON
             'code_secrets': 0,
             'code_critical_vulnerabilities': 0,
             'enforcement_on_artifact_push': 'Unhandled Yet',
@@ -153,6 +186,16 @@ class ProductReportGenerator:
             # JFrog CI Status - using jfrog_status not jfrog_ci
             if hasattr(repo.ci_status, 'jfrog_status') and repo.ci_status.jfrog_status:
                 data['jfrog_ci_status'] = repo.ci_status.jfrog_status.is_exist
+                
+                # Extract build names
+                if hasattr(repo.ci_status.jfrog_status, 'matched_build_names') and repo.ci_status.jfrog_status.matched_build_names:
+                    # Convert set to sorted list for consistent JSON output
+                    build_names_list = sorted(list(repo.ci_status.jfrog_status.matched_build_names))
+                    data['build_names'] = json.dumps(build_names_list)
+                elif repo.ci_status.jfrog_status.is_exist:
+                    # If JFrog CI exists but no build names (shouldn't happen with new logic), show empty list
+                    data['build_names'] = '[]'
+                # If no JFrog CI, keep default 'None'
             
             # Sonar CI Status - using sonar_status not sonar_ci
             if hasattr(repo.ci_status, 'sonar_status') and repo.ci_status.sonar_status:
@@ -168,10 +211,26 @@ class ProductReportGenerator:
                 data['critical_dependencies_vuln'] = getattr(deps_vuln, 'critical_count', 0)
                 data['high_dependencies_vuln'] = getattr(deps_vuln, 'high_count', 0)
                 
-                # Deployed artifacts - using correct attribute name
+                # Extract deployed artifacts with critical and high vulnerabilities
+                deployed_artifacts_data = {}
                 if hasattr(deps_vuln, 'artifacts') and deps_vuln.artifacts:
-                    artifact_names = [artifact.artifact_key for artifact in deps_vuln.artifacts]
-                    data['deployed_artifacts'] = json.dumps(artifact_names)
+                    for artifact in deps_vuln.artifacts:
+                        # Get artifact name (use artifact_key or jfrog_path as name)
+                        artifact_name = getattr(artifact, 'artifact_key', getattr(artifact, 'jfrog_path', 'unknown'))
+                        
+                        # Extract critical and high vulnerabilities only
+                        critical_count = getattr(artifact, 'critical_count', 0)
+                        high_count = getattr(artifact, 'high_count', 0)
+                        
+                        # Only include artifacts that have critical or high vulnerabilities
+                        if critical_count > 0 or high_count > 0:
+                            deployed_artifacts_data[artifact_name] = {
+                                'critical': critical_count,
+                                'high': high_count
+                            }
+                
+                # Convert to JSON string
+                data['deployed_artifacts_vulnerabilities'] = json.dumps(deployed_artifacts_data)
             
             # Code issues (secrets and vulnerabilities)
             if hasattr(vuln, 'code_issues') and vuln.code_issues:
@@ -185,27 +244,32 @@ class ProductReportGenerator:
         
         return data
     
-    def generate_csv_report(self, product: Product, output_dir: str) -> str:
-        """Generate CSV report for the product"""
+    def generate_csv_report(self, product: Product, output_dir: str) -> tuple[str, str]:
+        """Generate CSV and XLSX reports for the product"""
         csv_filename = f"{product.name.lower().replace(' ', '_')}_repos.csv"
+        xlsx_filename = f"{product.name.lower().replace(' ', '_')}_repos.xlsx"
         csv_path = os.path.join(output_dir, csv_filename)
+        xlsx_path = os.path.join(output_dir, xlsx_filename)
         
-        print("\n📝 Generating CSV report...")
+        print("\n📝 Generating CSV and XLSX reports...")
         
-        # Define CSV headers
+        # Define headers
         headers = [
+            'product_pillar',
+            'product',
             'scm_name',
             'repo_name', 
             'default_branch',
             'hr_info',
             'is_production',
             'jfrog_ci_status',
+            'build_names',
             'jfrog_cd_status',
-            'deployed_artifacts',
             'sonar_ci_status',
             'sonar_is_scanned',
             'critical_dependencies_vuln',
             'high_dependencies_vuln',
+            'deployed_artifacts_vulnerabilities',  # New column for deployed artifacts
             'code_secrets',
             'code_critical_vulnerabilities',
             'enforcement_on_artifact_push',
@@ -227,7 +291,22 @@ class ProductReportGenerator:
             writer.writeheader()
             writer.writerows(repo_data)
         
-        return csv_path
+        # Write XLSX file using pandas
+        try:
+            df = pd.DataFrame(repo_data)
+            # Ensure columns are in the correct order
+            df = df[headers]
+            df.to_excel(xlsx_path, index=False, engine='openpyxl')
+            print(f"✅ Generated XLSX file: {xlsx_filename}")
+        except Exception as e:
+            print(f"⚠️  Warning: Failed to generate XLSX file: {str(e)}")
+            print(f"   (CSV file was created successfully)")
+            # Return None for xlsx_path if it failed
+            xlsx_path = None
+        
+        print(f"✅ Generated CSV file: {csv_filename}")
+        
+        return csv_path, xlsx_path
     
     def run(self):
         """Main execution method"""
@@ -245,8 +324,8 @@ class ProductReportGenerator:
                 print(f"\n❌ No repositories found for {selected_product}")
                 return
             
-            # Generate CSV report
-            csv_path = self.generate_csv_report(product, output_dir)
+            # Generate CSV and XLSX reports
+            csv_path, xlsx_path = self.generate_csv_report(product, output_dir)
             
             # Generate summary document with visualizations
             summary_path = self.generate_summary_document(product, output_dir)
@@ -255,6 +334,8 @@ class ProductReportGenerator:
             print("\n✅ Report generated successfully!")
             print(f"📁 Output directory: {output_dir}")
             print(f"📄 CSV file: {csv_path}")
+            if xlsx_path:
+                print(f"📊 XLSX file: {xlsx_path}")
             print(f"📊 Summary document: {summary_path}")
             print(f"📈 Total repositories: {product.get_repos_count()}")
             
@@ -531,15 +612,24 @@ class ProductReportGenerator:
         
         # 1. CI/CD Integration Status (Pie Chart)
         ci_labels = ['JFrog CI', 'SonarQube CI', 'No CI Integration']
-        ci_values = [
-            stats['jfrog_ci_count'],
-            stats['sonar_ci_count'],
-            stats['total_repos'] - stats['jfrog_ci_count'] - stats['sonar_ci_count']
-        ]
-        colors1 = ['#2E8B57', '#4682B4', '#D3D3D3']
-        wedges, texts, autotexts = ax1.pie(ci_values, labels=ci_labels, autopct='%1.1f%%', 
-                                          colors=colors1, startangle=90)
-        ax1.set_title('CI/CD Integration Coverage', fontweight='bold')
+        
+        # Calculate values and ensure no negative values
+        jfrog_count = max(0, stats['jfrog_ci_count'])
+        sonar_count = max(0, stats['sonar_ci_count'])
+        total_with_ci = jfrog_count + sonar_count
+        no_ci_count = max(0, stats['total_repos'] - total_with_ci)
+        
+        ci_values = [jfrog_count, sonar_count, no_ci_count]
+        
+        # Only create pie chart if we have valid data
+        if sum(ci_values) > 0:
+            colors1 = ['#2E8B57', '#4682B4', '#D3D3D3']
+            ax1.pie(ci_values, labels=ci_labels, autopct='%1.1f%%', 
+                   colors=colors1, startangle=90)
+            ax1.set_title('CI/CD Integration Coverage', fontweight='bold')
+        else:
+            ax1.text(0.5, 0.5, 'No CI/CD data available', ha='center', va='center', transform=ax1.transAxes)
+            ax1.set_title('CI/CD Integration Coverage', fontweight='bold')
         
         # 2. Vulnerability Distribution (Bar Chart)
         vuln_categories = ['Critical', 'High', 'Medium', 'Low', 'Unknown']
@@ -581,12 +671,30 @@ class ProductReportGenerator:
         
         # 4. Overall Repository Status (Donut Chart)
         status_labels = ['With JFrog Vulns', 'With Sonar Issues', 'Clean Repos']
-        clean_repos = stats['total_repos'] - max(stats['jfrog_vulns_repos'], stats['sonar_issues_repos'])
-        status_values = [stats['jfrog_vulns_repos'], stats['sonar_issues_repos'], clean_repos]
+        
+        # Calculate clean repos properly to avoid negative values
+        # Clean repos = total repos - (repos with JFrog vulns + repos with Sonar issues - overlap)
+        # For simplicity, use the maximum since we don't track overlap precisely
+        repos_with_issues = max(stats['jfrog_vulns_repos'], stats['sonar_issues_repos'])
+        clean_repos = max(0, stats['total_repos'] - repos_with_issues)
+        
+        status_values = [
+            max(0, stats['jfrog_vulns_repos']), 
+            max(0, stats['sonar_issues_repos']), 
+            clean_repos
+        ]
         colors4 = ['#FF6B6B', '#4ECDC4', '#45B7D1']
         
-        wedges4, texts4, autotexts4 = ax4.pie(status_values, labels=status_labels, autopct='%1.1f%%',
-                                             colors=colors4, startangle=90, pctdistance=0.85)
+        # Only create pie chart if we have valid data
+        if sum(status_values) > 0:
+            wedges4, texts4, autotexts4 = ax4.pie(status_values, labels=status_labels, autopct='%1.1f%%',
+                                                 colors=colors4, startangle=90, pctdistance=0.85)
+            
+            # Create donut effect
+            centre_circle = plt.Circle((0,0), 0.70, fc='white')
+            ax4.add_artist(centre_circle)
+        else:
+            ax4.text(0.5, 0.5, 'No security data available', ha='center', va='center', transform=ax4.transAxes)
         
         # Create donut effect
         centre_circle = plt.Circle((0,0), 0.70, fc='white')

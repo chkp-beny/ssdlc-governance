@@ -19,7 +19,9 @@ class DeployedArtifact:
                  high_count: int = 0, medium_count: int = 0, low_count: int = 0,
                  unknown_count: int = 0, artifact_type: str = "unknown", 
                  build_name: Optional[str] = None, build_number: Optional[str] = None,
-                 created_at: Optional[str] = None, updated_at: Optional[str] = None):
+                 created_at: Optional[str] = None, updated_at: Optional[str] = None,
+                 build_timestamp: Optional[str] = None, sha256: Optional[str] = None,
+                 jfrog_path: Optional[str] = None):
         """
         Initialize deployed artifact
         
@@ -36,6 +38,9 @@ class DeployedArtifact:
             build_number (Optional[str]): Build number if available
             created_at (Optional[str]): When the artifact was created
             updated_at (Optional[str]): When the artifact was last updated
+            build_timestamp (Optional[str]): Build timestamp for JFrog matching
+            sha256 (Optional[str]): SHA256 hash for JFrog matching
+            jfrog_path (Optional[str]): Full JFrog path for the artifact
         """
         self.artifact_key = artifact_key
         self.repo_name = repo_name
@@ -49,6 +54,9 @@ class DeployedArtifact:
         self.build_number = build_number
         self.created_at = created_at
         self.updated_at = updated_at
+        self.build_timestamp = build_timestamp
+        self.sha256 = sha256
+        self.jfrog_path = jfrog_path
         self.is_latest = self._check_if_latest(artifact_key)
         
         logger.debug("DeployedArtifact created: %s (%s) - C=%d, H=%d, M=%d, L=%d, U=%d, is_latest=%s",
@@ -86,66 +94,7 @@ class DeployedArtifact:
         """Get formatted severity breakdown"""
         return f"C:{self.critical_count}, H:{self.high_count}, M:{self.medium_count}, L:{self.low_count}, U:{self.unknown_count}"
     
-    @staticmethod
-    def extract_repo_name_from_artifact_key(artifact_key: str) -> str:
-        """
-        Extract repository name from artifact key
-        
-        Examples:
-        - "cyberint-docker-virtual/alert-service:latest" -> "alert-service"
-        - "cyberint-npm-virtual/frontend-service/1.0.0" -> "frontend-service"
-        - "maven-repo/com/checkpoint/security-service/1.2.3" -> "security-service"
-        - "docker://staging/scoring-manager:5f0b0100..." -> "scoring-manager"
-        """
-        try:
-            # Handle protocol prefixes like docker://
-            if '://' in artifact_key:
-                # Remove protocol prefix (e.g., "docker://staging/service:tag" -> "staging/service:tag")
-                artifact_key = artifact_key.split('://', 1)[1]
-            
-            if '/' in artifact_key:
-                # Split by '/' and look for service name patterns
-                parts = artifact_key.split('/')
-                
-                # For docker artifacts: cyberint-docker-virtual/alert-service:latest
-                # Or protocol format: staging/scoring-manager:hash
-                if len(parts) >= 2 and 'docker' in parts[0]:
-                    service_part = parts[1]
-                    # Remove tag if present
-                    if ':' in service_part:
-                        service_part = service_part.split(':')[0]
-                    return service_part
-                elif len(parts) >= 2:
-                    # For protocol format like staging/scoring-manager:hash
-                    service_part = parts[-1]  # Take the last part
-                    # Remove tag/hash if present
-                    if ':' in service_part:
-                        service_part = service_part.split(':')[0]
-                    return service_part
-                
-                # For npm artifacts: cyberint-npm-virtual/frontend-service/1.0.0
-                elif len(parts) >= 2 and 'npm' in parts[0]:
-                    return parts[1]
-                
-                # For maven artifacts: maven-repo/com/checkpoint/security-service/1.2.3
-                elif len(parts) >= 4:
-                    return parts[-2]  # Second to last part is usually the artifact name
-                
-                # Default: take the last meaningful part
-                else:
-                    service_part = parts[-1]
-                    # Remove version/tag if present
-                    if ':' in service_part:
-                        service_part = service_part.split(':')[0]
-                    return service_part
-            else:
-                # No path separator, return as-is
-                return artifact_key
-                
-        except Exception as e:
-            logger.warning("Failed to extract repo name from artifact key '%s': %s", artifact_key, e)
-            return artifact_key
-    
+ 
     def __str__(self) -> str:
         """String representation of deployed artifact"""
         return f"Artifact({self.repo_name}, total={self.get_total_count()})"

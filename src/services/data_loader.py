@@ -331,6 +331,201 @@ class JfrogClient:
         except Exception as e:
             logger.error("Error processing JFrog build info: %s", str(e))
             return {}
+    
+    def fetch_build_metadata(self, build_name: str, project: str) -> dict:
+        """
+        Fetch build metadata for a specific build to get build numbers and versions
+        
+        Args:
+            build_name (str): Name of the build
+            project (str): Project name
+            
+        Returns:
+            dict: Build metadata with build numbers and timestamps
+        """
+        try:
+            logger.info("Fetching build metadata for build: %s in project: %s", build_name, project)
+            
+            # Build the API endpoint
+            url = f"{self.base_url}/artifactory/api/build/{build_name}"
+            
+            # Parameters for the API call
+            params = {'project': project}
+            
+            # Make the API request
+            response = requests.get(
+                url,
+                headers=self.headers,
+                params=params,
+                timeout=30
+            )
+            
+            # Check if request was successful
+            if response.status_code == 200:
+                data = response.json()
+                logger.debug("Successfully fetched build metadata for build %s", build_name)
+                return data
+            else:
+                logger.error("JFrog API error fetching build metadata: %s - %s", 
+                           response.status_code, response.text)
+                return {}
+                
+        except requests.exceptions.RequestException as e:
+            logger.error("JFrog API request failed for build metadata: %s", str(e))
+            return {}
+        except Exception as e:
+            logger.error("Error processing JFrog build metadata: %s", str(e))
+            return {}
+    
+    def fetch_build_details(self, build_name: str, build_number: str, project: str) -> dict:
+        """
+        Fetch detailed build information including properties and metadata
+        
+        Args:
+            build_name (str): Name of the build
+            build_number (str): Build number
+            project (str): Project name
+            
+        Returns:
+            dict: Detailed build information with properties
+        """
+        try:
+            logger.info("Fetching build details for build: %s/%s in project: %s", 
+                       build_name, build_number, project)
+            
+            # Build the API endpoint
+            url = f"{self.base_url}/artifactory/api/build/{build_name}/{build_number}"
+            
+            # Parameters for the API call
+            params = {'project': project}
+            
+            # Make the API request
+            response = requests.get(
+                url,
+                headers=self.headers,
+                params=params,
+                timeout=30
+            )
+            
+            # Check if request was successful
+            if response.status_code == 200:
+                data = response.json()
+                logger.debug("Successfully fetched build details for build %s/%s", 
+                           build_name, build_number)
+                return data
+            else:
+                logger.error("JFrog API error fetching build details: %s - %s", 
+                           response.status_code, response.text)
+                return {}
+                
+        except requests.exceptions.RequestException as e:
+            logger.error("JFrog API request failed for build details: %s", str(e))
+            return {}
+        except Exception as e:
+            logger.error("Error processing JFrog build details: %s", str(e))
+            return {}
+    
+    def query_aql_artifacts(self, repo_name: str) -> dict:
+        """
+        Query artifacts from a single local repository using AQL API.
+        Fetches artifact metadata with properties for vulnerability matching.
+        
+        Args:
+            repo_name (str): Single local repository name to query
+            
+        Returns:
+            dict: AQL response with artifact data
+        """
+        try:
+            logger.info("Querying AQL artifacts for repository: %s", repo_name)
+            
+            # Build AQL query for single repository
+            aql_query = f'items.find({{"repo": {{"$eq": "{repo_name}"}}, "type": "file"}}).include("property")'
+            
+            # Build the API endpoint
+            url = f"{self.base_url}/artifactory/api/search/aql"
+            
+            # Make the API request
+            response = requests.post(
+                url,
+                headers={**self.headers, 'Content-Type': 'text/plain'},
+                data=aql_query,
+                timeout=60
+            )
+            
+            # Check if request was successful
+            if response.status_code == 200:
+                data = response.json()
+                logger.info("Successfully queried AQL artifacts for %s: %d results", 
+                           repo_name, len(data.get('results', [])))
+                return data
+            else:
+                logger.error("Failed to query AQL artifacts for %s: %s", 
+                           repo_name, response.status_code)
+                return {}
+                
+        except (requests.RequestException, ValueError) as e:
+            logger.error("Error querying AQL artifacts for %s: %s", repo_name, str(e))
+            return {}
+    
+    def query_aql_specific_artifacts(self, repo_name: str, artifact_paths: List[tuple]) -> dict:
+        """
+        Query specific artifacts from a repository using AQL API with $or operator.
+        Optimized for fetching only missing artifacts instead of all artifacts.
+        
+        Args:
+            repo_name (str): Repository name to query
+            artifact_paths (List[tuple]): List of (path, name) tuples for specific artifacts
+            
+        Returns:
+            dict: AQL response with artifact data for requested artifacts only
+        """
+        try:
+            if not artifact_paths:
+                logger.warning("No artifact paths provided for specific AQL query")
+                return {}
+            
+            logger.info("Querying AQL for %d specific artifacts in repository: %s", 
+                       len(artifact_paths), repo_name)
+            
+            # Build $or conditions for each artifact path
+            or_conditions = []
+            for path, name in artifact_paths:
+                or_conditions.append(f'{{"path": {{"$eq": "{path}"}}, "name": {{"$eq": "{name}"}}}}')
+            
+            or_clause = ', '.join(or_conditions)
+            
+            # Build AQL query with $or operator
+            aql_query = f'items.find({{"repo": {{"$eq": "{repo_name}"}}, "$or": [{or_clause}]}}).include("property")'
+            
+            logger.debug("AQL query: %s", aql_query)
+            
+            # Build the API endpoint
+            url = f"{self.base_url}/artifactory/api/search/aql"
+            
+            # Make the API request
+            response = requests.post(
+                url,
+                headers={**self.headers, 'Content-Type': 'text/plain'},
+                data=aql_query,
+                timeout=60
+            )
+            
+            # Check if request was successful
+            if response.status_code == 200:
+                data = response.json()
+                logger.info("Successfully queried %d specific artifacts for %s: %d results found", 
+                           len(artifact_paths), repo_name, len(data.get('results', [])))
+                return data
+            else:
+                logger.error("Failed to query specific AQL artifacts for %s: %s", 
+                           repo_name, response.status_code)
+                return {}
+                
+        except (requests.RequestException, ValueError) as e:
+            logger.error("Error querying specific AQL artifacts for %s: %s", repo_name, str(e))
+            return {}
+    
 
 
 class SonarClient:

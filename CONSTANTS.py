@@ -55,8 +55,8 @@ PRODUCT_ORGANIZATION_ID = {
     "Policy Insights": "0",
     "SaaS": "0",
     "Cyberint": "2", 
-    "Avanan": "0",
-    "SASE": "0",
+    "Avanan": "3",
+    "SASE": "4",
     "FWaaS": "0"
 }
 
@@ -74,6 +74,18 @@ PRODUCT_JFROG_PROJECT = {
 # JFrog API Configuration
 JFROG_BASE_URL = "https://cpart.jfrog.io"
 
+# Product-JFrog Token Mapping
+# Maps products to their corresponding environment variable names for JFrog tokens
+PRODUCT_JFROG_TOKEN_ENV = {
+    "Datatube": "CYBERINT_JFROG_ACCESS_TOKEN",
+    "Policy Insights": "CYBERINT_JFROG_ACCESS_TOKEN",
+    "SaaS": "CYBERINT_JFROG_ACCESS_TOKEN",
+    "Cyberint": "CYBERINT_JFROG_ACCESS_TOKEN",
+    "Avanan": "AVANAN_JFROG_ACCESS_TOKEN",
+    "SASE": "CYBERINT_JFROG_ACCESS_TOKEN",
+    "FWaaS": "CYBERINT_JFROG_ACCESS_TOKEN"
+}
+
 # Product-Sonar Prefix Mapping
 PRODUCT_SONAR_PREFIX = {
     "Datatube": "datatube-",
@@ -84,3 +96,20 @@ PRODUCT_SONAR_PREFIX = {
     "SASE": "sase-",
     "FWaaS": "fwaas-"
 }
+
+# Helper functions for token management
+import os
+
+def get_jfrog_token_for_product(product_name: str) -> tuple[str, str]:
+    """
+    Get the JFrog token for a specific product.
+    
+    Args:
+        product_name: Name of the product
+        
+    Returns:
+        tuple: (token_value, token_env_var_name)
+    """
+    token_env_var = PRODUCT_JFROG_TOKEN_ENV.get(product_name, "CYBERINT_JFROG_ACCESS_TOKEN")
+    token_value = os.getenv(token_env_var, "")
+    return token_value, token_env_var

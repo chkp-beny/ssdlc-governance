@@ -45,7 +45,7 @@
 - **Purpose**: SonarQube integration status
 
 ### JfrogCIStatus
-- **Fields**: is_exist, branch, ci_platform, job_url, deployed_artifacts (List[string])
+- **Fields**: is_exist, branch, ci_platform, job_url, matched_build_names (Set[string])
 - **Purpose**: JFrog integration status
 
 ### CDStatus

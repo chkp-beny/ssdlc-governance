@@ -28,6 +28,9 @@ ENV/
 
 # Environment Variables
 .env
+
+# Build info cache directory
+build_info_cache_dir/
 .env.local
 .env.development
 .env.test
@@ -54,3 +57,12 @@ Thumbs.db
 
 # Project-specific
 notes.txt
+
+# Generated Reports
+reports/
+
+# Raw API Responses and Instructions
+instructions_and_api_responses/
+
+# Build Info Cache Directory
+build_info_cache_dir/
