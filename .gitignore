@@ -61,6 +61,10 @@ notes.txt
 # Generated Reports
 reports/
 
+# HRDB CSV files
+HRDB.csv
+HRDB*.csv
+
 # Raw API Responses and Instructions
 instructions_and_api_responses/
 

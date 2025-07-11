@@ -42,7 +42,6 @@ class ProductReport:
         if not all_rows:
             print("No data to report.")
             return ""
-        # Determine output format by report type
         if self.output_format == "xlsx":
             # Excel only, no CSV
             xlsx_filename = f"{self.report_type}_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"

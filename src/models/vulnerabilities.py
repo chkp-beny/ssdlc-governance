@@ -196,6 +196,109 @@ class DependenciesVulnerabilities:
         """Get formatted severity breakdown"""
         return f"C:{self.critical_count}, H:{self.high_count}, M:{self.medium_count}, L:{self.low_count}, U:{self.unknown_count}"
     
+    def _normalize_build_name(self, name):
+        return name.strip().lower() if name else None
+
+    def _get_latest_artifact(self, build_name: str):
+        # Return the artifact with the maximal build_timestamp for a given build_name (normalized)
+        norm_build_name = self._normalize_build_name(build_name)
+        logger.debug("[_get_latest_artifact] build_name=%s (normalized=%s)", build_name, norm_build_name)
+        logger.debug("[_get_latest_artifact] All artifacts: %s", [
+            {
+                'artifact_key': a.artifact_key,
+                'build_name': a.build_name,
+                'build_name_normalized': self._normalize_build_name(a.build_name),
+                'build_timestamp': a.build_timestamp,
+                'critical_count': a.critical_count,
+                'high_count': a.high_count
+            } for a in self.artifacts
+        ])
+        candidates = [a for a in self.artifacts if self._normalize_build_name(a.build_name) == norm_build_name and a.build_timestamp]
+        logger.debug("[_get_latest_artifact] Candidates for build_name '%s' (normalized='%s'): %s", build_name, norm_build_name, [
+            {
+                'artifact_key': a.artifact_key,
+                'build_name': a.build_name,
+                'build_name_normalized': self._normalize_build_name(a.build_name),
+                'build_timestamp': a.build_timestamp,
+                'critical_count': a.critical_count,
+                'high_count': a.high_count
+            } for a in candidates
+        ])
+        if not candidates:
+            logger.warning("[_get_latest_artifact] No candidates found for build_name '%s' (normalized='%s')", build_name, norm_build_name)
+            return None
+        # build_timestamp is string, convert to int for comparison
+        latest = max(candidates, key=lambda a: int(a.build_timestamp))
+        logger.debug("[_get_latest_artifact] Latest candidate: %r", latest)
+        return latest
+
+    def _get_latest_artifacts_by_build(self, build_names):
+        # Return a dict {build_name: latest_artifact} using normalized build names
+        result = {}
+        for build_name in build_names:
+            latest = self._get_latest_artifact(build_name)
+            if latest:
+                result[build_name] = latest
+        return result
+
+    def get_critical_count(self, repo_publish_artifacts_type, matched_build_names):
+        logger.debug("[get_critical_count] repo_publish_artifacts_type=%s, matched_build_names=%s", repo_publish_artifacts_type, matched_build_names)
+        logger.debug("[get_critical_count] All artifacts: %s", [
+            {
+                'artifact_key': a.artifact_key,
+                'build_name': a.build_name,
+                'build_name_normalized': self._normalize_build_name(a.build_name),
+                'build_timestamp': a.build_timestamp,
+                'critical_count': a.critical_count,
+                'high_count': a.high_count
+            } for a in self.artifacts
+        ])
+        logger.debug("[get_critical_count] Normalized matched_build_names: %s", [self._normalize_build_name(bn) for bn in matched_build_names])
+        if not matched_build_names:
+            logger.debug("[get_critical_count] No matched_build_names, returning 0")
+            return 0
+        if repo_publish_artifacts_type == "mono":
+            build_name = next(iter(matched_build_names))
+            latest = self._get_latest_artifact(build_name)
+            logger.debug("[get_critical_count] MONO: build_name=%s, latest=%r", build_name, latest)
+            return latest.critical_count if latest else 0
+        elif repo_publish_artifacts_type == "multi":
+            latest_artifacts = self._get_latest_artifacts_by_build(matched_build_names)
+            logger.debug("[get_critical_count] MULTI: latest_artifacts=%r", latest_artifacts)
+            return sum(a.critical_count for a in latest_artifacts.values())
+        else:
+            logger.debug("[get_critical_count] Unknown repo_publish_artifacts_type: %s, returning 0", repo_publish_artifacts_type)
+            return 0
+
+    def get_high_count(self, repo_publish_artifacts_type, matched_build_names):
+        logger.debug("[get_high_count] repo_publish_artifacts_type=%s, matched_build_names=%s", repo_publish_artifacts_type, matched_build_names)
+        logger.debug("[get_high_count] All artifacts: %s", [
+            {
+                'artifact_key': a.artifact_key,
+                'build_name': a.build_name,
+                'build_name_normalized': self._normalize_build_name(a.build_name),
+                'build_timestamp': a.build_timestamp,
+                'critical_count': a.critical_count,
+                'high_count': a.high_count
+            } for a in self.artifacts
+        ])
+        logger.debug("[get_high_count] Normalized matched_build_names: %s", [self._normalize_build_name(bn) for bn in matched_build_names])
+        if not matched_build_names:
+            logger.debug("[get_high_count] No matched_build_names, returning 0")
+            return 0
+        if repo_publish_artifacts_type == "mono":
+            build_name = next(iter(matched_build_names))
+            latest = self._get_latest_artifact(build_name)
+            logger.debug("[get_high_count] MONO: build_name=%s, latest=%r", build_name, latest)
+            return latest.high_count if latest else 0
+        elif repo_publish_artifacts_type == "multi":
+            latest_artifacts = self._get_latest_artifacts_by_build(matched_build_names)
+            logger.debug("[get_high_count] MULTI: latest_artifacts=%r", latest_artifacts)
+            return sum(a.high_count for a in latest_artifacts.values())
+        else:
+            logger.debug("[get_high_count] Unknown repo_publish_artifacts_type: %s, returning 0", repo_publish_artifacts_type)
+            return 0
+        
     def __str__(self) -> str:
         """String representation of dependencies vulnerabilities"""
         return f"DepsVuln(total={self.get_total_count()}, artifacts={len(self.artifacts)})"
@@ -307,6 +410,7 @@ class CodeIssues:
     def has_critical_vulnerabilities(self) -> bool:
         """Check if there are critical vulnerabilities"""
         return self.get_critical_vulnerability_count() > 0
+    
     
     def get_severity_breakdown(self) -> str:
         """Get formatted breakdown by issue type"""

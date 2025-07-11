@@ -54,8 +54,15 @@ class DevOpsReport(ProductReport):
             vuln = repo.vulnerabilities
             if hasattr(vuln, 'dependencies_vulns') and vuln.dependencies_vulns:
                 deps_vuln = vuln.dependencies_vulns
-                data['critical_dependencies_vulnerabilities_jfrog'] = getattr(deps_vuln, 'critical_count', 0)
-                data['high_dependencies_vulnerabilities_jfrog'] = getattr(deps_vuln, 'high_count', 0)
+                jfrog_status = getattr(getattr(repo, 'ci_status', None), 'jfrog_status', None)
+                if jfrog_status:
+                    data['critical_dependencies_vulnerabilities_jfrog'] = deps_vuln.get_critical_count(
+                        jfrog_status.repo_publish_artifacts_type, jfrog_status.matched_build_names)
+                    data['high_dependencies_vulnerabilities_jfrog'] = deps_vuln.get_high_count(
+                        jfrog_status.repo_publish_artifacts_type, jfrog_status.matched_build_names)
+                else:
+                    data['critical_dependencies_vulnerabilities_jfrog'] = 0
+                    data['high_dependencies_vulnerabilities_jfrog'] = 0
                 deployed_artifacts_data = {}
                 if hasattr(deps_vuln, 'artifacts') and deps_vuln.artifacts:
                     for artifact in deps_vuln.artifacts:

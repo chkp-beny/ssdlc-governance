@@ -874,9 +874,9 @@ class Product:
                     # (cache_hits will be incremented only if artifact is actually found)
                     
                     # Look for this artifact in the AQL cache
-                    build_name = self._find_build_name_in_aql(aql_data, path, name)
+                    build_info = self._extract_artifact_build_info_from_aql(aql_data, path, name)
                     
-                    if not build_name:
+                    if not build_info:
                         # Artifact not found in existing cache - could indicate stale cache
                         logger.warning("🔍 Artifact not found in AQL cache for repo '%s': %s (cache may be stale)", 
                                      repo_name, full_path)
@@ -888,6 +888,7 @@ class Product:
                         missing_from_cache += 1
                         continue
                     
+                    build_name, build_number, build_timestamp, sha256 = build_info
                     if build_name in self.unmapped_build_names:
                         logger.debug("Skipping unmapped build name '%s' for artifact '%s'", build_name, artifact_key)
                         continue
@@ -901,13 +902,12 @@ class Product:
                         # Extract vulnerability data
                         vulnerabilities = vuln_data.get('vulnerabilities', {})
                         updated_at = vuln_data.get('updated_at')
-                        
                         # Create DeployedArtifact object
                         deployed_artifact = self._create_deployed_artifact(
-                            artifact_key, repo, vulnerabilities, updated_at, 
-                            build_name, full_path
+                            artifact_key, repo, vulnerabilities, updated_at,
+                            build_name, full_path,
+                            build_number=build_number, build_timestamp=build_timestamp, sha256=sha256
                         )
-                        
                         # Add to artifacts by repo
                         if repo not in artifacts_by_repo:
                             artifacts_by_repo[repo] = []
@@ -1047,9 +1047,9 @@ class Product:
             logger.warning("Failed to load AQL cache from %s: %s", cache_file_path, str(e))
             return None
     
-    def _find_build_name_in_aql(self, aql_data: dict, path: str, name: str) -> Optional[str]:
+    def _extract_artifact_build_info_from_aql(self, aql_data: dict, path: str, name: str) -> Optional[tuple]:
         """
-        Find build name for artifact in AQL data
+        Extract build info (name, number, timestamp, sha256) for artifact in AQL data
         
         Args:
             aql_data (dict): AQL response data
@@ -1057,37 +1057,39 @@ class Product:
             name (str): Artifact name
             
         Returns:
-            Optional[str]: Build name or None if not found
+            Optional[tuple]: (build_name, build_number, build_timestamp, sha256) or None if not found
         """
         try:
             results = aql_data.get('results', [])
-            
             for result in results:
-                # Match by path and name
                 if result.get('path') == path and result.get('name') == name:
-                    # Look for build.name in properties
+                    build_name = None
+                    build_number = None
+                    build_timestamp = None
+                    sha256 = None
                     properties = result.get('properties', [])
                     for prop in properties:
                         if prop.get('key') == 'build.name':
                             build_name_value = prop.get('value')
                             if build_name_value:
-                                # Handle different build name formats:
-                                # Format: "Frontend/frontend-service/jfrog" -> extract "frontend-service"
-                                # Format: "frontend-service" -> use as-is
                                 if '/' in build_name_value:
                                     parts = build_name_value.split('/')
                                     if len(parts) >= 2:
-                                        # Extract the middle part (service name)
-                                        return parts[1]
+                                        build_name = parts[1]
                                     else:
-                                        return parts[0]
+                                        build_name = parts[0]
                                 else:
-                                    return build_name_value
-            
+                                    build_name = build_name_value
+                        elif prop.get('key') == 'build.number':
+                            build_number = prop.get('value')
+                        elif prop.get('key') == 'build.timestamp':
+                            build_timestamp = prop.get('value')
+                        elif prop.get('key') == 'sha256':
+                            sha256 = prop.get('value')
+                    return build_name, build_number, build_timestamp, sha256
             return None
-            
         except (ValueError, KeyError, IndexError) as e:
-            logger.debug("Error finding build name in AQL data: %s", str(e))
+            logger.debug("Error extracting build info in AQL data: %s", str(e))
             return None
     
     def _match_build_name_to_repo(self, build_name: str, repo_build_names_map: dict) -> Optional[str]:
@@ -1113,7 +1115,7 @@ class Product:
             return None
     
     def _create_deployed_artifact(self, artifact_key: str, repo_name: str, vulnerabilities: dict, 
-                                updated_at: str, build_name: str, jfrog_path: str):
+                                updated_at: str, build_name: str, jfrog_path: str, build_number=None, build_timestamp=None, sha256=None):
         """
         Create DeployedArtifact object from vulnerability data
         
@@ -1124,6 +1126,9 @@ class Product:
             updated_at (str): Last updated timestamp
             build_name (str): Build name
             jfrog_path (str): Full JFrog path
+            build_number (str, optional): Build number from AQL properties
+            build_timestamp (str, optional): Build timestamp from AQL properties
+            sha256 (str, optional): sha256 from AQL properties
             
         Returns:
             DeployedArtifact: Created artifact object
@@ -1139,7 +1144,6 @@ class Product:
         
         # Extract artifact type
         artifact_type = self._extract_artifact_type(artifact_key)
-        
         return DeployedArtifact(
             artifact_key=artifact_key,
             repo_name=repo_name,
@@ -1151,7 +1155,10 @@ class Product:
             artifact_type=artifact_type,
             build_name=build_name,
             updated_at=updated_at,
-            jfrog_path=jfrog_path
+            jfrog_path=jfrog_path,
+            build_number=build_number,
+            build_timestamp=build_timestamp,
+            sha256=sha256
         )
     
     def _fetch_missing_artifacts_from_aql(self, missing_artifacts_by_repo: dict, jfrog_client,
@@ -1283,23 +1290,23 @@ class Product:
                         path = '/'.join(path_parts[1:-1]) if len(path_parts) > 2 else ""
 
                         # Find build name in AQL data
-                        build_name = self._find_build_name_in_aql(aql_response, path, name)
+                        build_info = self._extract_artifact_build_info_from_aql(aql_response, path, name)
 
-                        if not build_name:
+                        if not build_info:
                             logger.debug("No build name found for artifact: %s", artifact_path)
                             continue
 
                         # Skip if build name is already known to be unmapped
-                        if build_name in self.unmapped_build_names:
-                            logger.debug("Skipping build name '%s' as it is already known to be unmapped", build_name)
+                        if build_info[0] in self.unmapped_build_names:
+                            logger.debug("Skipping build name '%s' as it is already known to be unmapped", build_info[0])
                             continue
 
                         # Match build name to repository
-                        repo = self.build_name_to_repo_map.get(build_name)
+                        repo = self.build_name_to_repo_map.get(build_info[0])
                         if not repo:
                             logger.warning("❌ Build name '%s' from artifact '%s' not found in any repository's matched build names", 
-                                         build_name, artifact_path)
-                            self.unmapped_build_names.add(build_name)  # Add to unmapped list
+                                         build_info[0], artifact_path)
+                            self.unmapped_build_names.add(build_info[0])  # Add to unmapped list
                             continue
 
                         # Find the original artifact key and vulnerability data
@@ -1321,7 +1328,7 @@ class Product:
                         # Create DeployedArtifact
                         deployed_artifact = self._create_deployed_artifact(
                             original_artifact_key, repo, vulnerabilities, 
-                            updated_at, build_name, artifact_path
+                            updated_at, build_info[0], artifact_path
                         )
 
                         # Add to artifacts by repo

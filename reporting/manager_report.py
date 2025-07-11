@@ -58,8 +58,15 @@ class ManagerReport(ProductReport):
             vuln = repo.vulnerabilities
             if hasattr(vuln, 'dependencies_vulns') and vuln.dependencies_vulns:
                 deps_vuln = vuln.dependencies_vulns
-                data['critical_dependencies_vulnerabilities_jfrog'] = getattr(deps_vuln, 'critical_count', 0)
-                data['high_dependencies_vulnerabilities_jfrog'] = getattr(deps_vuln, 'high_count', 0)
+                jfrog_status = getattr(getattr(repo, 'ci_status', None), 'jfrog_status', None)
+                if jfrog_status:
+                    data['critical_dependencies_vulnerabilities_jfrog'] = deps_vuln.get_critical_count(
+                        jfrog_status.repo_publish_artifacts_type, jfrog_status.matched_build_names)
+                    data['high_dependencies_vulnerabilities_jfrog'] = deps_vuln.get_high_count(
+                        jfrog_status.repo_publish_artifacts_type, jfrog_status.matched_build_names)
+                else:
+                    data['critical_dependencies_vulnerabilities_jfrog'] = 0
+                    data['high_dependencies_vulnerabilities_jfrog'] = 0
             if hasattr(vuln, 'code_issues') and vuln.code_issues:
                 code_issues = vuln.code_issues
                 data['critical_code_secrets_sonar'] = code_issues.get_secrets_count() if hasattr(code_issues, 'get_secrets_count') else 0

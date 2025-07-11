@@ -9,6 +9,7 @@ class TestingReport(ProductReport):
         'product', 'scm', 'repo_name', 'repo_type', 'repo_owner',
         'status_scan_dependencies_jfrog', 'map_build_names_to_method',
         'status_build_names_jfrog', 'status_scan_sast_sonar',
+        'repo_publish_artifacts_type',  # mono/multi field
         'critical_dependencies_vulnerabilities_jfrog',
         'high_dependencies_vulnerabilities_jfrog',
         'deployed_artifacts_dependencies_vulnerabilities',
@@ -34,6 +35,7 @@ class TestingReport(ProductReport):
         # Sonar/CI status
         data['status_scan_sast_sonar'] = False
         # Vulnerabilities
+        data['repo_publish_artifacts_type'] = "unhandled yet"
         data['critical_dependencies_vulnerabilities_jfrog'] = 0
         data['high_dependencies_vulnerabilities_jfrog'] = 0
         data['deployed_artifacts_dependencies_vulnerabilities'] = '{}'
@@ -58,6 +60,8 @@ class TestingReport(ProductReport):
                     data['map_build_names_to_method'] = json.dumps(mapping_methods)
                 else:
                     data['map_build_names_to_method'] = '{}'
+                # Add mono/multi field
+                data['repo_publish_artifacts_type'] = getattr(repo.ci_status.jfrog_status, 'repo_publish_artifacts_type', 'unhandled yet')
             if hasattr(repo.ci_status, 'sonar_status') and repo.ci_status.sonar_status:
                 data['status_scan_sast_sonar'] = repo.ci_status.sonar_status.is_exist
 
@@ -66,8 +70,15 @@ class TestingReport(ProductReport):
             vuln = repo.vulnerabilities
             if hasattr(vuln, 'dependencies_vulns') and vuln.dependencies_vulns:
                 deps_vuln = vuln.dependencies_vulns
-                data['critical_dependencies_vulnerabilities_jfrog'] = getattr(deps_vuln, 'critical_count', 0)
-                data['high_dependencies_vulnerabilities_jfrog'] = getattr(deps_vuln, 'high_count', 0)
+                jfrog_status = getattr(getattr(repo, 'ci_status', None), 'jfrog_status', None)
+                if jfrog_status:
+                    data['critical_dependencies_vulnerabilities_jfrog'] = deps_vuln.get_critical_count(
+                        jfrog_status.repo_publish_artifacts_type, jfrog_status.matched_build_names)
+                    data['high_dependencies_vulnerabilities_jfrog'] = deps_vuln.get_high_count(
+                        jfrog_status.repo_publish_artifacts_type, jfrog_status.matched_build_names)
+                else:
+                    data['critical_dependencies_vulnerabilities_jfrog'] = 0
+                    data['high_dependencies_vulnerabilities_jfrog'] = 0
                 deployed_artifacts_data = {}
                 if hasattr(deps_vuln, 'artifacts') and deps_vuln.artifacts:
                     for artifact in deps_vuln.artifacts:

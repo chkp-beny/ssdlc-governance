@@ -81,8 +81,22 @@ class JfrogCIStatus:
         self.job_url = job_url
         self.matched_build_names = matched_build_names or set()
         self.build_name_mapping_methods = build_name_mapping_methods or {}
-        
-        logger.debug("JfrogCIStatus created: exists=%s", is_exist)
+        # mono = only one build name, multi = more than one
+        self.repo_publish_artifacts_type = self._determine_repo_publish_artifacts_type()
+        logger.debug("JfrogCIStatus created: exists=%s, repo_publish_artifacts_type=%s", is_exist, self.repo_publish_artifacts_type)
+
+    def _determine_repo_publish_artifacts_type(self) -> str:
+        if len(self.matched_build_names) == 1:
+            return "mono"
+        elif len(self.matched_build_names) > 1:
+            return "multi"
+        else:
+            return "unknown"
+
+    def add_build_name(self, build_name: str):
+        self.matched_build_names.add(build_name)
+        self.repo_publish_artifacts_type = self._determine_repo_publish_artifacts_type()
+        logger.debug("Added build name %s, repo_publish_artifacts_type now %s", build_name, self.repo_publish_artifacts_type)
     
     def is_configured(self) -> bool:
         """Check if JFrog is properly configured"""
@@ -101,9 +115,10 @@ class JfrogCIStatus:
             self.matched_build_names = matched_build_names
         if build_name_mapping_methods is not None:
             self.build_name_mapping_methods = build_name_mapping_methods
-        logger.debug("JfrogCIStatus.is_exist updated to: %s, branch: %s, builds: %s, mapping_methods: %s", 
+        self.repo_publish_artifacts_type = self._determine_repo_publish_artifacts_type()
+        logger.debug("JfrogCIStatus.is_exist updated to: %s, branch: %s, builds: %s, mapping_methods: %s, repo_publish_artifacts_type: %s", 
                     exists, branch, len(matched_build_names) if matched_build_names else 0, 
-                    len(build_name_mapping_methods) if build_name_mapping_methods else 0)
+                    len(build_name_mapping_methods) if build_name_mapping_methods else 0, self.repo_publish_artifacts_type)
     
     def __str__(self) -> str:
         """String representation of JFrog CI status"""
