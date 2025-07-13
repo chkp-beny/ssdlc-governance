@@ -9,10 +9,11 @@ from datetime import datetime
 class TestingReport(ProductReport):
     report_type = "testing"
     columns = [
-        'product', 'scm', 'repo_name', 'repo_type', 'repo_owner',
+        'product', 'scm', 'repo_name', 'repo_type',
+        'repo_owner', 'general_manager', 'vp',
         'status_scan_dependencies_jfrog', 'map_build_names_to_method',
         'status_build_names_jfrog', 'status_scan_sast_sonar',
-        'repo_publish_artifacts_type',  # mono/multi field
+        'repo_publish_artifacts_type',
         'critical_dependencies_vulnerabilities_jfrog',
         'high_dependencies_vulnerabilities_jfrog',
         'deployed_artifacts_dependencies_vulnerabilities',
@@ -30,7 +31,9 @@ class TestingReport(ProductReport):
         data['scm'] = PRODUCT_SCM_TYPE.get(product_name, 'unknown')
         data['repo_name'] = getattr(repo, 'get_repository_name', lambda: 'unknown')()
         data['repo_type'] = "unhandled yet"
-        data['repo_owner'] = "unhandled yet"
+        data['repo_owner'] = repo.get_primary_owner_email() if hasattr(repo, 'get_primary_owner_email') else "unknown"
+        data['general_manager'] = repo.get_primary_owner_general_manager() if hasattr(repo, 'get_primary_owner_general_manager') else "unknown"
+        data['vp'] = repo.get_primary_owner_vp() if hasattr(repo, 'get_primary_owner_vp') else "unknown"
         # JFrog/CI status
         data['status_scan_dependencies_jfrog'] = False
         data['status_build_names_jfrog'] = 'None'

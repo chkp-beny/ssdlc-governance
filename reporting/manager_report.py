@@ -7,7 +7,7 @@ class ManagerReport(ProductReport):
     report_type = "manager"
     columns = [
         'product_pillar', 'product', 'scm', 'repo_name', 'repo_type',
-        'repo_owner', 'general_manager', 'area_manager', 'vp',
+        'repo_owner', 'general_manager', 'vp',
         'status_scan_dependencies_jfrog', 'status_scan_sast_sonar',
         'critical_dependencies_vulnerabilities_jfrog',
         'high_dependencies_vulnerabilities_jfrog',
@@ -32,10 +32,9 @@ class ManagerReport(ProductReport):
         data['product_pillar'] = product_pillar
         data['repo_name'] = getattr(repo, 'get_repository_name', lambda: 'unknown')()
         data['repo_type'] = "unhandled yet"
-        data['repo_owner'] = "unhandled yet"
-        data['general_manager'] = "unhandled yet"
-        data['area_manager'] = "unhandled yet"
-        data['vp'] = "unhandled yet"
+        data['repo_owner'] = repo.get_primary_owner_email() if hasattr(repo, 'get_primary_owner_email') else "unknown"
+        data['general_manager'] = repo.get_primary_owner_general_manager() if hasattr(repo, 'get_primary_owner_general_manager') else "unknown"
+        data['vp'] = repo.get_primary_owner_vp() if hasattr(repo, 'get_primary_owner_vp') else "unknown"
         # JFrog/CI status
         data['status_scan_dependencies_jfrog'] = False
         data['status_scan_sast_sonar'] = False

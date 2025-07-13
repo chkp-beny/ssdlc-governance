@@ -142,8 +142,6 @@ class Repo:
         """Get default branch"""
         return self.scm_info.default_branch
     
-
-    
     def has_ci_status(self) -> bool:
         """Check if CI status information is available"""
         return self.ci_status is not None
@@ -161,3 +159,38 @@ class Repo:
         return (f"Repo(name='{self.get_repository_name()}', "
                 f"product='{self.product_name}', "
                 f"is_production={self.is_production})")
+    
+    def get_primary_owner_dict(self) -> dict:
+        """
+        Returns the first owner dict in repo_owners, or None if not present.
+        """
+        if self.repo_owners and len(self.repo_owners) > 0:
+            return self.repo_owners[0]
+        return None
+
+    def get_primary_owner_email(self) -> str:
+        """
+        Returns the email of the first repo owner (username@checkpoint.com), or 'unknown' if not present.
+        """
+        owner = self.get_primary_owner_dict()
+        if owner and owner.get('name'):
+            return f"{owner['name']}@checkpoint.com"
+        return "unknown"
+
+    def get_primary_owner_general_manager(self) -> str:
+        """
+        Returns the general_manager of the first repo owner, or 'unknown' if not present.
+        """
+        owner = self.get_primary_owner_dict()
+        if owner and owner.get('general_manager'):
+            return owner['general_manager']
+        return "unknown"
+
+    def get_primary_owner_vp(self) -> str:
+        """
+        Returns the vp of the first repo owner, or 'unknown' if not present.
+        """
+        owner = self.get_primary_owner_dict()
+        if owner and owner.get('vp'):
+            return owner['vp']
+        return "unknown"

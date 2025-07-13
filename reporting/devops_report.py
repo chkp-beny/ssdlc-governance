@@ -6,7 +6,8 @@ from CONSTANTS import PRODUCT_SCM_TYPE
 class DevOpsReport(ProductReport):
     report_type = "devops"
     columns = [
-        'product', 'scm', 'repo_name', 'repo_type', 'repo_owner',
+        'product', 'scm', 'repo_name', 'repo_type',
+        'repo_owner', 'general_manager', 'vp',
         'status_scan_dependencies_jfrog', 'status_build_names_jfrog',
         'status_scan_sast_sonar',
         'critical_dependencies_vulnerabilities_jfrog',
@@ -26,7 +27,9 @@ class DevOpsReport(ProductReport):
         data['scm'] = PRODUCT_SCM_TYPE.get(product_name, 'unknown')
         data['repo_name'] = getattr(repo, 'get_repository_name', lambda: 'unknown')()
         data['repo_type'] = "unhandled yet"
-        data['repo_owner'] = "unhandled yet"
+        data['repo_owner'] = repo.get_primary_owner_email() if hasattr(repo, 'get_primary_owner_email') else "unknown"
+        data['general_manager'] = repo.get_primary_owner_general_manager() if hasattr(repo, 'get_primary_owner_general_manager') else "unknown"
+        data['vp'] = repo.get_primary_owner_vp() if hasattr(repo, 'get_primary_owner_vp') else "unknown"
         data['status_scan_dependencies_jfrog'] = False
         data['status_build_names_jfrog'] = 'None'
         data['status_scan_sast_sonar'] = False

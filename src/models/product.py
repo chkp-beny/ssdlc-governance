@@ -163,6 +163,8 @@ class Product:
     def _populate_gitlab_repo_owners(self, repo, gitlab_client, hrdb_client):
         """
         Populate the repo_owners field for a GitLab repo using project owners and HRDB info.
+        Sort owners so that those with the most frequent (case-insensitive) 'vp' value appear first.
+        Owners with vp=None or 'unknown' (case-insensitive) are always at the end.
         """
         project_id = getattr(repo.scm_info, 'id', None)
         if not project_id:
@@ -176,17 +178,52 @@ class Product:
             repo.repo_owners = []
             return
 
-        repo.repo_owners = []
+        enriched_owners = []
         for owner in owners:
             username = owner.get('username')
             access_level = owner.get('access_level')
             hr_info = hrdb_client.get_manager_vp(username)
-            repo.repo_owners.append({
+            enriched_owners.append({
                 'name': username,
                 'access_level': access_level,
                 'general_manager': hr_info.get('general_manager'),
                 'vp': hr_info.get('vp')
             })
+
+        # Sorting logic (case-insensitive for vp)
+        # 1. Group owners by vp (case-insensitive, except None/unknown)
+        # 2. Count frequency of each vp (excluding None/unknown)
+        # 3. Owners with most frequent vp (case-insensitive) come first
+        # 4. Owners with vp None or 'unknown' (case-insensitive) always at the end
+        from collections import Counter, defaultdict
+
+        def normalize_vp(vp):
+            if vp is None:
+                return None
+            if isinstance(vp, str) and vp.strip().lower() == 'unknown':
+                return None
+            return vp.strip().lower() if isinstance(vp, str) else vp
+
+        # Build list of normalized vps (excluding None/unknown)
+        vps = [normalize_vp(owner['vp']) for owner in enriched_owners if normalize_vp(owner['vp']) is not None]
+        vp_counter = Counter(vps)
+
+        # For each owner, assign a sort key:
+        #   - (-(vp_count), original_index) for owners with a valid vp
+        #   - (float('inf'), original_index) for owners with vp None/unknown (always at end)
+        def owner_sort_key(owner_with_index):
+            idx, owner = owner_with_index
+            vp_norm = normalize_vp(owner['vp'])
+            if vp_norm is None:
+                return (float('inf'), idx)
+            # Negative count for descending sort
+            return (-vp_counter[vp_norm], idx)
+
+        # Attach original index to preserve order among ties
+        owners_with_index = list(enumerate(enriched_owners))
+        sorted_owners = [owner for idx, owner in sorted(owners_with_index, key=owner_sort_key)]
+
+        repo.repo_owners = sorted_owners
 
     def _populate_bitbucket_repo_owners(self, repo, bitbucket_client, hrdb_client):
         """

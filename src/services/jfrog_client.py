@@ -21,12 +21,12 @@ class JfrogClient:
         """
         # Import constants for base URL
         try:
-            from src.CONSTANTS import JFROG_BASE_URL
+            from CONSTANTS import JFROG_BASE_URL
         except ImportError:
             import sys
             import os
             sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-            from src.CONSTANTS import JFROG_BASE_URL
+            from CONSTANTS import JFROG_BASE_URL
         
         self.access_token = access_token
         self.base_url = JFROG_BASE_URL.rstrip('/')
