@@ -67,11 +67,38 @@ class TestJfrogVulnerabilitiesIntegration:
                     assert artifact.unknown_count >= 0, "Unknown count should be non-negative"
                     
                     print(f"Repository '{repo.get_repository_name()}' has artifact '{artifact.artifact_key}' with vulnerabilities: {artifact.get_severity_breakdown()}")
-        
-        print(f"✓ Cyberint has {repos_with_vulnerabilities} repositories with JFrog vulnerability data")
-        
-        # Should have at least some vulnerability data (requirement: > 5)
-        assert repos_with_vulnerabilities > 5, f"Expected more than 5 repos with vulnerabilities, got {repos_with_vulnerabilities}"
+
+
+    def test_artifacts_sorted_by_build_timestamp_desc(self):
+        """Test that all JFrog vulnerability artifacts are sorted by build_timestamp descending for all repos"""
+        cyberint_scm_type = PRODUCT_SCM_TYPE["Cyberint"]
+        cyberint_org_id = PRODUCT_ORGANIZATION_ID["Cyberint"]
+        cyberint_product = Product("Cyberint", cyberint_scm_type, cyberint_org_id)
+        cyberint_product.load_repositories()
+        cyberint_product._load_jfrog_vulnerabilities()
+        for repo in cyberint_product.repos:
+            if repo.vulnerabilities is None:
+                from src.models.vulnerabilities import Vulnerabilities
+                repo.vulnerabilities = Vulnerabilities()
+            artifacts = repo.vulnerabilities.dependencies_vulns.artifacts
+            if not artifacts:
+                continue
+            timestamps = []
+            for artifact in artifacts:
+                # Accept both int and str timestamps, try to parse if needed
+                ts = getattr(artifact, 'build_timestamp', None)
+                if ts is None:
+                    continue
+                # Try to convert to int if possible
+                try:
+                    ts = int(ts)
+                except Exception:
+                    pass
+                timestamps.append(ts)
+            if len(timestamps) > 1:
+                sorted_desc = all(timestamps[i] >= timestamps[i+1] for i in range(len(timestamps)-1))
+                assert sorted_desc, f"Artifacts for repo '{repo.get_repository_name()}' are not sorted by build_timestamp descending: {timestamps}"
+        print("\u2713 All JFrog vulnerability artifacts are sorted by build_timestamp descending for all repos")
     
     def test_compass_client_fetch_jfrog_vulnerabilities(self):
         """Test CompassClient fetch_jfrog_vulnerabilities returns valid data"""

@@ -29,6 +29,26 @@ class ProductReport:
             product.load_ci_data()
             product.load_vulnerabilities()
             loaded.append(product)
+
+        # Sort artifacts by build_timestamp descending for all products/repos
+        for product in loaded:
+            for repo in getattr(product, 'repos', []):
+                vuln = getattr(repo, 'vulnerabilities', None)
+                if vuln and hasattr(vuln, 'dependencies_vulns') and vuln.dependencies_vulns:
+                    deps_vuln = vuln.dependencies_vulns
+                    if hasattr(deps_vuln, 'artifacts') and deps_vuln.artifacts:
+                        deps_vuln.artifacts.sort(
+                            key=lambda a: int(getattr(a, 'build_timestamp', 0) or 0) if getattr(a, 'build_timestamp', None) not in (None, '') else float('-inf'),
+                            reverse=True
+                        )
+                    # --- Ensure top-level counts are set for reporting/serialization ---
+                    # Retrieve from repo.ci_status if available (JfrogCIStatus etc.)
+                    ci_status = getattr(repo, 'ci_status', None)
+                    jfrog_status = getattr(ci_status, 'jfrog_status', None)
+                    repo_publish_artifacts_type = getattr(jfrog_status, 'repo_publish_artifacts_type', None)
+                    matched_build_names = getattr(jfrog_status, 'matched_build_names', None)
+                    if repo_publish_artifacts_type and matched_build_names:
+                        deps_vuln.set_top_level_counts(repo_publish_artifacts_type, matched_build_names)
         return loaded
 
     def extract_repo_data(self, repo, product_name: str) -> dict:

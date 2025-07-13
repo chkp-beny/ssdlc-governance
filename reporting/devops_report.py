@@ -56,10 +56,8 @@ class DevOpsReport(ProductReport):
                 deps_vuln = vuln.dependencies_vulns
                 jfrog_status = getattr(getattr(repo, 'ci_status', None), 'jfrog_status', None)
                 if jfrog_status:
-                    data['critical_dependencies_vulnerabilities_jfrog'] = deps_vuln.get_critical_count(
-                        jfrog_status.repo_publish_artifacts_type, jfrog_status.matched_build_names)
-                    data['high_dependencies_vulnerabilities_jfrog'] = deps_vuln.get_high_count(
-                        jfrog_status.repo_publish_artifacts_type, jfrog_status.matched_build_names)
+                    data['critical_dependencies_vulnerabilities_jfrog'] = deps_vuln.critical_count
+                    data['high_dependencies_vulnerabilities_jfrog'] = deps_vuln.high_count
                 else:
                     data['critical_dependencies_vulnerabilities_jfrog'] = 0
                     data['high_dependencies_vulnerabilities_jfrog'] = 0

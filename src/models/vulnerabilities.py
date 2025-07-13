@@ -135,42 +135,54 @@ class DependenciesVulnerabilities:
         self.low_count = low_count
         self.unknown_count = unknown_count
         self.artifacts = artifacts or []
-        
-        # Update counters based on artifacts if provided
-        if self.artifacts:
-            self._update_counters_from_artifacts()
-        
         logger.debug("DependenciesVulnerabilities created: C=%d, H=%d, M=%d, L=%d, U=%d, artifacts=%d",
                     self.critical_count, self.high_count, self.medium_count, self.low_count, self.unknown_count, len(self.artifacts))
     
     def add_artifact(self, artifact: DeployedArtifact):
-        """Add a deployed artifact to the list and update counters"""
+        """Add a deployed artifact to the list"""
         self.artifacts.append(artifact)
-        # Update counters based on the new artifact list
-        self._update_counters_from_artifacts()
-        
-        logger.debug("Added artifact %s, new totals: C=%d, H=%d, M=%d, L=%d, U=%d",
-                    artifact.repo_name, self.critical_count, self.high_count, 
-                    self.medium_count, self.low_count, self.unknown_count)
+        logger.debug("Added artifact %s", artifact.repo_name)
     
-    def _update_counters_from_artifacts(self):
-        """
-        Update counters based on the sum of vulnerabilities from all artifacts.
-        """
-        if not self.artifacts:
-            self.critical_count = self.high_count = self.medium_count = self.low_count = self.unknown_count = 0
-            return
 
-        # Sum vulnerabilities from all artifacts
-        self.critical_count = sum(artifact.critical_count for artifact in self.artifacts)
-        self.high_count = sum(artifact.high_count for artifact in self.artifacts)
-        self.medium_count = sum(artifact.medium_count for artifact in self.artifacts)
-        self.low_count = sum(artifact.low_count for artifact in self.artifacts)
-        self.unknown_count = sum(artifact.unknown_count for artifact in self.artifacts)
-        
-        logger.debug("Updated total counts from %d artifacts: C=%d, H=%d, M=%d, L=%d, U=%d",
-                     len(self.artifacts), self.critical_count, self.high_count,
-                     self.medium_count, self.low_count, self.unknown_count)
+    def set_top_level_counts(self, repo_publish_artifacts_type, matched_build_names):
+        """
+        Set the top-level counters (critical_count, high_count, etc.) based on the current artifacts and logic.
+        Should be called before serialization or CSV reporting to ensure fields are up-to-date.
+        """
+        self.critical_count = self.get_critical_count(repo_publish_artifacts_type, matched_build_names)
+        self.high_count = self.get_high_count(repo_publish_artifacts_type, matched_build_names)
+        # For medium, low, unknown, use similar logic as high/critical if needed
+        self.medium_count = self._get_severity_count('medium', repo_publish_artifacts_type, matched_build_names)
+        self.low_count = self._get_severity_count('low', repo_publish_artifacts_type, matched_build_names)
+        self.unknown_count = self._get_severity_count('unknown', repo_publish_artifacts_type, matched_build_names)
+        logger.debug("[set_top_level_counts] Set: C=%d, H=%d, M=%d, L=%d, U=%d", self.critical_count, self.high_count, self.medium_count, self.low_count, self.unknown_count)
+
+    def _get_severity_count(self, severity, repo_publish_artifacts_type, matched_build_names):
+        """
+        Helper to get severity count for medium, low, unknown using the same mono/multi logic.
+        """
+        if not matched_build_names:
+            return 0
+        if repo_publish_artifacts_type == "mono":
+            build_name = next(iter(matched_build_names))
+            latest = self._get_latest_artifact(build_name)
+            if not latest:
+                return 0
+            if severity == 'medium':
+                return latest.medium_count
+            elif severity == 'low':
+                return latest.low_count
+            elif severity == 'unknown':
+                return latest.unknown_count
+        elif repo_publish_artifacts_type == "multi":
+            latest_artifacts = self._get_latest_artifacts_by_build(matched_build_names)
+            if severity == 'medium':
+                return sum(a.medium_count for a in latest_artifacts.values())
+            elif severity == 'low':
+                return sum(a.low_count for a in latest_artifacts.values())
+            elif severity == 'unknown':
+                return sum(a.unknown_count for a in latest_artifacts.values())
+        return 0
     
     def get_artifacts_by_repo_name(self, repo_name: str) -> List[DeployedArtifact]:
         """Get all artifacts for a specific repository"""

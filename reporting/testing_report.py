@@ -1,6 +1,9 @@
 import json
 from .product_report import ProductReport
 from CONSTANTS import PRODUCT_SCM_TYPE
+from src.utils.serialization import serialize_recursive
+import os
+from datetime import datetime
 
 
 class TestingReport(ProductReport):
@@ -72,10 +75,8 @@ class TestingReport(ProductReport):
                 deps_vuln = vuln.dependencies_vulns
                 jfrog_status = getattr(getattr(repo, 'ci_status', None), 'jfrog_status', None)
                 if jfrog_status:
-                    data['critical_dependencies_vulnerabilities_jfrog'] = deps_vuln.get_critical_count(
-                        jfrog_status.repo_publish_artifacts_type, jfrog_status.matched_build_names)
-                    data['high_dependencies_vulnerabilities_jfrog'] = deps_vuln.get_high_count(
-                        jfrog_status.repo_publish_artifacts_type, jfrog_status.matched_build_names)
+                    data['critical_dependencies_vulnerabilities_jfrog'] = deps_vuln.critical_count
+                    data['high_dependencies_vulnerabilities_jfrog'] = deps_vuln.high_count
                 else:
                     data['critical_dependencies_vulnerabilities_jfrog'] = 0
                     data['high_dependencies_vulnerabilities_jfrog'] = 0
@@ -96,3 +97,21 @@ class TestingReport(ProductReport):
                 data['critical_code_secrets_sonar'] = code_issues.get_secrets_count() if hasattr(code_issues, 'get_secrets_count') else 0
                 data['critical_code_vulnerabilities_sonar'] = code_issues.get_critical_vulnerability_count() if hasattr(code_issues, 'get_critical_vulnerability_count') else 0
         return data
+
+    def generate_report(self, output_dir: str) -> str:
+        # Generate the CSV report as usual
+        csv_path = super().generate_report(output_dir)
+
+        # Generate the full JSON serialization alongside the CSV
+        all_products = self.load_all_products()
+        serialized = {}
+        for product in all_products:
+            serialized[product.name] = [serialize_recursive(repo) for repo in product.repos]
+
+        # Save JSON file in the same output directory as the CSV
+        json_filename = f"{self.report_type}_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        json_path = os.path.join(output_dir, json_filename)
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(serialized, f, indent=2)
+        print(f"✅ Generated JSON file: {json_path}")
+        return csv_path
