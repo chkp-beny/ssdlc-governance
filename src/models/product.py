@@ -79,25 +79,146 @@ class Product:
         """
         Load repositories for this product using DataLoader
         Fetches repositories based on product's SCM type and organization ID
+        Adds progress logging for repo owner retrieval.
         """
         try:
             # Load repositories using DataLoader with product's SCM info
             repo_data = self.data_loader.load_repositories(self.scm_type, self.organization_id)
-            
+
+            # Always initialize HRDB client utility
+            from src.services.hrdb_client import HRDBClient
+            hrdb_client = HRDBClient()
+
+            # Modular SCM client initialization
+            scm_clients = self._initialize_scm_clients()
+
             # Parse repo_data and create Repo objects
             self.repos = []
+            total_repos = len(repo_data)
+            logger.info("📦 Found %d repositories for product '%s'. Starting repo owner retrieval...", total_repos, self.name)
+            processed_repos = 0
             for repo_json in repo_data:
                 try:
                     repo = Repo.from_json(repo_json, self.name)
+                    processed_repos += 1
+                    # Progress logging every 10 repos, and always for first and last
+                    if processed_repos == 1 or processed_repos == total_repos or processed_repos % 10 == 0:
+                        logger.info("🔄 Progress: %d/%d repositories processed for owner detection (%.1f%%)",
+                                    processed_repos, total_repos, (processed_repos/total_repos)*100)
+                    # Populate repo_owners for Bitbucket repos
+                    if self.scm_type == 'bitbucket_server':
+                        bitbucket_client = scm_clients.get('bitbucket_client')
+                        if bitbucket_client:
+                            self._populate_bitbucket_repo_owners(repo, bitbucket_client, hrdb_client)
+                    # Populate repo_owners for GitLab repos
+                    elif self.scm_type == 'gitlab':
+                        gitlab_client = scm_clients.get('gitlab_client')
+                        if gitlab_client:
+                            self._populate_gitlab_repo_owners(repo, gitlab_client, hrdb_client)
+                    # Future SCM types can be handled here
                     self.repos.append(repo)
                 except (ValueError, KeyError) as e:
                     logger.warning("Failed to create Repo from JSON for %s: %s", 
                                   repo_json.get('repo_name', 'unknown'), str(e))
-            
-            logger.info("Successfully loaded %d repositories for product '%s'", len(self.repos), self.name)
-            
+
+            logger.info("✅ Successfully loaded %d repositories for product '%s' and completed repo owner retrieval.", len(self.repos), self.name)
         except (ImportError, ValueError) as e:
             logger.error("Error loading repositories for product '%s': %s", self.name, str(e))
+
+    def _initialize_scm_clients(self):
+        """
+        Initialize and return a dictionary of SCM-related clients/utilities for this product.
+        This modular approach allows easy extension for new SCM types.
+        Returns:
+            dict: Mapping of client names to initialized client objects.
+        """
+        clients = {}
+        import os
+        if self.scm_type == 'bitbucket_server':
+            try:
+                from src.services.bitbucket_client import BitbucketClient
+                from CONSTANTS import PRODUCT_SCM_TOKEN_ENV
+                token_env = PRODUCT_SCM_TOKEN_ENV.get(self.name, None)
+                token = os.getenv(token_env, '') if token_env else ''
+                if not token:
+                    logger.warning("No SCM token found for product '%s', skipping SCM owner detection.", self.name)
+                else:
+                    clients['bitbucket_client'] = BitbucketClient(token)
+            except ImportError as e:
+                logger.error("Failed to import Bitbucket client: %s", str(e))
+        elif self.scm_type == 'gitlab':
+            try:
+                from src.services.gitlab_client import GitlabClient
+                from CONSTANTS import PRODUCT_SCM_TOKEN_ENV
+                token_env = PRODUCT_SCM_TOKEN_ENV.get(self.name, None)
+                token = os.getenv(token_env, '') if token_env else ''
+                if not token:
+                    logger.warning("No SCM token found for product '%s', skipping SCM owner detection.", self.name)
+                else:
+                    clients['gitlab_client'] = GitlabClient(token)
+            except ImportError as e:
+                logger.error("Failed to import Gitlab client: %s", str(e))
+        # Future SCM types (e.g., github) can be added here
+        return clients
+    def _populate_gitlab_repo_owners(self, repo, gitlab_client, hrdb_client):
+        """
+        Populate the repo_owners field for a GitLab repo using project owners and HRDB info.
+        """
+        project_id = getattr(repo.scm_info, 'id', None)
+        if not project_id:
+            logger.warning("No project_id found for repo '%s', skipping owner detection.", getattr(repo.scm_info, 'full_name', 'unknown'))
+            repo.repo_owners = []
+            return
+
+        owners = gitlab_client.fetch_project_owners(project_id)
+        if not owners:
+            logger.warning("No owners found for GitLab project_id '%s'", project_id)
+            repo.repo_owners = []
+            return
+
+        repo.repo_owners = []
+        for owner in owners:
+            username = owner.get('username')
+            access_level = owner.get('access_level')
+            hr_info = hrdb_client.get_manager_vp(username)
+            repo.repo_owners.append({
+                'name': username,
+                'access_level': access_level,
+                'general_manager': hr_info.get('general_manager'),
+                'vp': hr_info.get('vp')
+            })
+
+    def _populate_bitbucket_repo_owners(self, repo, bitbucket_client, hrdb_client):
+        """
+        Populate the repo_owners field for a Bitbucket repo using PR reviewers and HRDB info.
+        """
+        # Parse project_key and repo_slug from scm_info.full_name
+        try:
+            project_key, repo_slug = repo.scm_info.full_name.split('/', 1)
+        except Exception as e:
+            logger.warning("Failed to parse project/repo from full_name '%s': %s", repo.scm_info.full_name, str(e))
+            repo.repo_owners = []
+            return
+
+        reviewers = bitbucket_client.fetch_recent_merged_pr_reviewers(project_key, repo_slug)
+        if not reviewers:
+            logger.warning("No reviewers found for repo '%s'", repo.scm_info.full_name)
+            repo.repo_owners = []
+            return
+
+        from collections import Counter
+        counts = Counter(reviewers)
+        top_reviewers = counts.most_common(3)
+
+        repo.repo_owners = []
+        for username, review_count in top_reviewers:
+            hr_info = hrdb_client.get_manager_vp(username)
+            repo.repo_owners.append({
+                'name': username,
+                'review_count': review_count,
+                'general_manager': hr_info['general_manager'],
+                'vp': hr_info['vp']
+            })
     
     def load_ci_data(self):
         """
@@ -145,7 +266,7 @@ class Product:
                 logger.warning("%s not found, skipping JFrog CI data loading for product '%s'", token_env_var, self.name)
                 return
             
-            from src.services.data_loader import JfrogClient
+            from src.services.jfrog_client import JfrogClient
             jfrog_client = JfrogClient(jfrog_token)
             
             # Fetch build information (raw JSON)
@@ -755,7 +876,7 @@ class Product:
             logger.info("🔍 Loading JFrog vulnerabilities for product '%s'", self.name)
             
             # Initialize CompassClient
-            from src.services.data_loader import CompassClient
+            from src.services.compass_client import CompassClient
             compass_token = os.getenv('COMPASS_ACCESS_TOKEN', '')
             compass_url = os.getenv('COMPASS_BASE_URL', '')
             
@@ -794,7 +915,7 @@ class Product:
                 return
             
             # Initialize JFrog client for AQL queries
-            from src.services.data_loader import JfrogClient
+            from src.services.jfrog_client import JfrogClient
             jfrog_client = JfrogClient(jfrog_token)
             
             # Setup AQL cache directory using project name
@@ -1402,7 +1523,7 @@ class Product:
         """
         try:
             # Initialize CompassClient
-            from src.services.data_loader import CompassClient
+            from src.services.compass_client import CompassClient
             compass_token = os.getenv('COMPASS_ACCESS_TOKEN', '')
             compass_url = os.getenv('COMPASS_BASE_URL', '')
             

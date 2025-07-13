@@ -78,6 +78,7 @@ PRODUCT_JFROG_PROJECT = {
 # JFrog API Configuration
 JFROG_BASE_URL = "https://cpart.jfrog.io"
 
+
 # Product-JFrog Token Mapping
 # Maps products to their corresponding environment variable names for JFrog tokens
 PRODUCT_JFROG_TOKEN_ENV = {
@@ -90,6 +91,19 @@ PRODUCT_JFROG_TOKEN_ENV = {
     "FWaaS": ""
 }
 
+# Product-SCM Token Mapping
+# Maps products to their corresponding environment variable names for SCM tokens
+PRODUCT_SCM_TOKEN_ENV = {
+    "Datatube": "",
+    "Policy Insights": "",
+    "SaaS": "",
+    "Cyberint": "CYBERINT_SCM_TOKEN",
+    "Avanan": "",
+    "SASE": "",
+    "FWaaS": "",
+    "Inext": "INEXT_SCM_TOKEN"
+}
+
 # Product-Sonar Prefix Mapping
 PRODUCT_SONAR_PREFIX = {
     "Datatube": "datatube-",
@@ -98,7 +112,8 @@ PRODUCT_SONAR_PREFIX = {
     "Cyberint": "cyberint-",
     "Avanan": "avanan-",
     "SASE": "sase-",
-    "FWaaS": "fwaas-"
+    "FWaaS": "fwaas-",
+    "Inext": "inext-"
 }
 
 # Helper functions for token management

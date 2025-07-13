@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 import logging
 from datetime import datetime
 from .scm_info import SCMInfo
-from .hr_info import HRInfo
+
 from .ci_status import CIStatus
 from .cd_status import CDStatus
 from .vulnerabilities import Vulnerabilities
@@ -19,46 +19,47 @@ logger = logging.getLogger(__name__)
 class Repo:
     """
     Central repository representation and main aggregator for all repository-related information
+    Now includes repo_owners (list of dicts with owner info) instead of hr_info.
     """
-    
+
     def __init__(self, scm_info: SCMInfo, product_name: str, 
-                 hr_info: Optional[HRInfo] = None, is_production: bool = False):
+                 repo_owners: Optional[list] = None, is_production: bool = False):
         """
         Initialize repository with core information
-        
+
         Args:
             scm_info (SCMInfo): Source control management information
             product_name (str): Product name for HR mapping
-            hr_info (Optional[HRInfo]): Human resources/organizational information
+            repo_owners (Optional[list]): List of repository owners (dicts)
             is_production (bool): Whether this is a production repository
         """
         self.scm_info = scm_info
         self.product_name = product_name
-        self.hr_info = hr_info or HRInfo(product_name)
+        self.repo_owners = repo_owners or []
         self.is_production = is_production
-        
+
         # These will be updated later, not on init
         self.ci_status: Optional[CIStatus] = None
         self.cd_status: Optional[CDStatus] = None
         self.vulnerabilities: Optional[Vulnerabilities] = None
         self.enforcement_status: Optional[EnforcementStatus] = None
-        
+
         logger.debug("Repo created: %s", self.get_repository_name())
     
     @classmethod
     def from_json(cls, repo_data: Dict[str, Any], product_name: str) -> 'Repo':
         """
         Create Repo object from JSON response data
-        
+
         Args:
             repo_data (Dict[str, Any]): Repository JSON data from API response
             product_name (str): Product name for HR mapping
-            
+
         Returns:
             Repo: Configured repository object
         """
         logger.debug("Creating Repo from JSON data for: %s", repo_data.get('repo_name', 'unknown'))
-        
+
         # Parse SCM information from JSON
         scm_info = SCMInfo(
             repo_name=repo_data.get('repo_name', ''),
@@ -69,18 +70,15 @@ class Repo:
             created_in_compass_at=cls._parse_datetime(repo_data.get('repo_created_at')),
             updated_in_compass_at=cls._parse_datetime(repo_data.get('repo_updated_at'))
         )
-        
-        # Create HR info with product name
-        hr_info = HRInfo(product_name)
-        
-        # Create repository object
+
+        # Create repository object with empty repo_owners (to be filled later)
         repo = cls(
             scm_info=scm_info,
             product_name=product_name,
-            hr_info=hr_info,
+            repo_owners=[],
             is_production=False  # TODO: implement production detection logic
         )
-        
+
         logger.info("Successfully created Repo object for: %s", repo.get_repository_name())
         return repo
     
@@ -144,11 +142,7 @@ class Repo:
         """Get default branch"""
         return self.scm_info.default_branch
     
-    def get_repo_owner(self) -> Optional[str]:
-        """Get repository owner from HR info if available"""
-        if self.hr_info:
-            return self.hr_info.repo_owner
-        return None
+
     
     def has_ci_status(self) -> bool:
         """Check if CI status information is available"""
