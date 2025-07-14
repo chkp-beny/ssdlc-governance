@@ -7,6 +7,7 @@ from src.models.product import Product
 from src.models.devops import DevOps
 from CONSTANTS import PILLAR_PRODUCTS, PRODUCT_DEVOPS, PRODUCT_SCM_TYPE, PRODUCT_ORGANIZATION_ID
 
+
 class ProductReport:
     report_type = "base"
     columns: list = []
@@ -15,8 +16,11 @@ class ProductReport:
     def __init__(self, products: list):
         self.products = products
         self.data: list = []
+        self._loaded_products = None  # cache for loaded products
 
     def load_all_products(self) -> list:
+        if self._loaded_products is not None:
+            return self._loaded_products
         loaded = []
         for pname in self.products:
             print(f"\n📊 Loading data for {pname}...")
@@ -49,6 +53,7 @@ class ProductReport:
                     matched_build_names = getattr(jfrog_status, 'matched_build_names', None)
                     if repo_publish_artifacts_type and matched_build_names:
                         deps_vuln.set_top_level_counts(repo_publish_artifacts_type, matched_build_names)
+        self._loaded_products = loaded
         return loaded
 
     def extract_repo_data(self, repo, product_name: str) -> dict:

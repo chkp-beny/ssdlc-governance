@@ -24,6 +24,13 @@ PRODUCT_SCM_TYPE = {
     "Inext": "gitlab"
 }
 
+# Product-GitHub Organization Mapping
+# Maps product names to their GitHub organization names
+PRODUCT_SCM_ORG_NAME = {
+    "Avanan": "Avanan",
+    "SASE": "perimeter-81"
+}
+
 # Product-Organization ID Mapping - All organizations use ID 0
 PRODUCT_ORGANIZATION_ID = {
     "Datatube": "0",
@@ -43,7 +50,7 @@ PRODUCT_JFROG_PROJECT = {
     "SaaS": "",
     "Cyberint": "cyberint",
     "Avanan": "hec",
-    "SASE": "",
+    "SASE": "hsase",
     "FWaaS": "fwaas",
     "Inext": ""
 }
@@ -71,8 +78,8 @@ PRODUCT_SCM_TOKEN_ENV = {
     "Policy Insights": "",
     "SaaS": "",
     "Cyberint": "CYBERINT_SCM_TOKEN",
-    "Avanan": "",
-    "SASE": "",
+    "Avanan": "AVANAN_SCM_TOKEN",
+    "SASE": "SASE_SCM_TOKEN",
     "FWaaS": "",
     "Inext": "INEXT_SCM_TOKEN"
 }

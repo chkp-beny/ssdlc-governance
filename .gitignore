@@ -70,3 +70,6 @@ instructions_and_api_responses/
 
 # Build Info Cache Directory
 build_info_cache_dir/
+
+# Debugging Folders
+github_api_debug/

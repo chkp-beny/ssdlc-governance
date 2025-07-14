@@ -28,7 +28,6 @@ class DataLoader:
         from src.services.jfrog_client import JfrogClient
         from src.services.sonar_client import SonarClient
         compass_url = os.environ["COMPASS_BASE_URL"]
-        jfrog_url = os.environ["JFROG_BASE_URL"]
         sonar_url = os.environ["SONAR_BASE_URL"]
         self.compass_client = CompassClient(compass_token, compass_url)
         self.jfrog_client = JfrogClient(jfrog_token) if jfrog_token else None

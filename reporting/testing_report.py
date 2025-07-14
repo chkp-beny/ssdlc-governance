@@ -105,7 +105,7 @@ class TestingReport(ProductReport):
         # Generate the CSV report as usual
         csv_path = super().generate_report(output_dir)
 
-        # Generate the full JSON serialization alongside the CSV
+        # Use cached products for JSON serialization
         all_products = self.load_all_products()
         serialized = {}
         for product in all_products:

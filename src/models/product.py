@@ -65,13 +65,9 @@ class Product:
         
         # Get credentials from environment variables
         compass_token = os.getenv('COMPASS_ACCESS_TOKEN', '')
-        compass_url = os.getenv('COMPASS_BASE_URL', '')
-        
+
         # Initialize DataLoader (other API credentials can be added later)
-        self.data_loader = DataLoader(
-            compass_token=compass_token,
-            compass_url=compass_url
-        )
+        self.data_loader = DataLoader(compass_token=compass_token)
         
         logger.debug("DataLoader initialized for product '%s'", self.name)
     
@@ -121,19 +117,17 @@ class Product:
                     logger.warning("Failed to create Repo from JSON for %s: %s", 
                                   repo_json.get('repo_name', 'unknown'), str(e))
 
+            if self.scm_type == 'github':
+                github_client = scm_clients.get('github_client')
+                if github_client:
+                    self._populate_github_repo_owners(github_client, hrdb_client)
+
             logger.info("✅ Successfully loaded %d repositories for product '%s' and completed repo owner retrieval.", len(self.repos), self.name)
         except (ImportError, ValueError) as e:
             logger.error("Error loading repositories for product '%s': %s", self.name, str(e))
-
+    
     def _initialize_scm_clients(self):
-        """
-        Initialize and return a dictionary of SCM-related clients/utilities for this product.
-        This modular approach allows easy extension for new SCM types.
-        Returns:
-            dict: Mapping of client names to initialized client objects.
-        """
         clients = {}
-        import os
         if self.scm_type == 'bitbucket_server':
             try:
                 from src.services.bitbucket_client import BitbucketClient
@@ -158,8 +152,87 @@ class Product:
                     clients['gitlab_client'] = GitlabClient(token)
             except ImportError as e:
                 logger.error("Failed to import Gitlab client: %s", str(e))
-        # Future SCM types (e.g., github) can be added here
+        elif self.scm_type == 'github':
+            try:
+                from src.services.github_client import GitHubClient
+                from CONSTANTS import PRODUCT_SCM_TOKEN_ENV, PRODUCT_SCM_ORG_NAME
+                token_env = PRODUCT_SCM_TOKEN_ENV.get(self.name, None)
+                org = PRODUCT_SCM_ORG_NAME.get(self.name, None)
+                token = os.getenv(token_env, '') if token_env else ''
+                if not token or not org:
+                    logger.warning("No GitHub token or org found for product '%s', skipping GitHub owner detection.", self.name)
+                else:
+                    clients['github_client'] = GitHubClient(token, org)
+            except ImportError as e:
+                logger.error("Failed to import GitHub client: %s", str(e))
         return clients
+
+    def _populate_github_repo_owners(self, github_client, hrdb_client):
+        """
+        Populate the repo_owners field for all GitHub repos in self.repos using batch GraphQL.
+        Enriches with HRDB info and sorts reviewers by review count (desc).
+        """
+        # Collect all repo names (as expected by GitHubClient)
+        repo_names = []
+        repo_map = {}
+        for repo in self.repos:
+            # Assumes repo.scm_info.full_name is "org/repo"
+            repo_name = getattr(repo.scm_info, 'repo_name', None)
+            if repo_name:
+                repo_names.append(repo_name)
+                repo_map[repo_name] = repo
+
+        if not repo_names:
+            logger.warning("No GitHub repositories found for owner detection in product '%s'", self.name)
+            return
+
+        # Batch fetch reviewers for all repos in chunks of 100
+        batch_size = 50
+        reviewers_by_repo = {}
+
+        for i in range(0, len(repo_names), batch_size):
+            batch = repo_names[i:i + batch_size]
+            batch_num = i // batch_size + 1
+            total_batches = (len(repo_names) + batch_size - 1) // batch_size
+            
+            logger.info(f"🔄 Fetching GitHub PR reviewers for batch {batch_num}/{total_batches} ({len(batch)} repos)...")
+            
+            batch_results = github_client.fetch_repo_reviewers_batch(batch)
+            reviewers_by_repo.update(batch_results)
+
+        if not reviewers_by_repo:
+            logger.warning("No reviewers returned from GitHub batch queries for product '%s'", self.name)
+            return
+
+        for repo_name, reviewers in reviewers_by_repo.items():
+            repo = repo_map.get(repo_name)
+            if not repo:
+                continue
+            if not reviewers:
+                repo.repo_owners = []
+                continue
+
+            # Count reviewers by frequency
+            from collections import Counter
+            counts = Counter(reviewers)
+            top_reviewers = counts.most_common(3)
+
+            enriched_owners = []
+            for username, review_count in top_reviewers:
+                # Normalize username if it starts with 'chkp-'
+                if username and username.startswith('chkp-'):
+                    normalized_username = username[len('chkp-'):]
+                else:
+                    normalized_username = username
+                hr_info = hrdb_client.get_manager_vp(normalized_username)
+                enriched_owners.append({
+                    'name': normalized_username,
+                    'review_count': review_count,
+                    'general_manager': hr_info.get('general_manager'),
+                    'vp': hr_info.get('vp')
+                })
+            repo.repo_owners = enriched_owners
+
     def _populate_gitlab_repo_owners(self, repo, gitlab_client, hrdb_client):
         """
         Populate the repo_owners field for a GitLab repo using project owners and HRDB info.
