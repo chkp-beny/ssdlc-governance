@@ -1,3 +1,5 @@
+import os
+import json
 # Pillar-Product Mapping
 PILLAR_PRODUCTS = {
     "Infinity": ["Datatube", "Policy Insights", "Cyberint"],
@@ -8,36 +10,7 @@ PILLAR_PRODUCTS = {
 }
 
 # Product-DevOps Mapping
-PRODUCT_DEVOPS = {
-    "Datatube": {
-        "name": "Michael Shohat",
-        "email": "michaels@checkpoint.com"
-    },
-    "Policy Insights": {
-        "name": "David Shlomov",
-        "email": "davids@checkpoint.com"
-    },
-    "SaaS": {
-        "name": "Mooli Tayer",
-        "email": "moolit@checkpoint.com"
-    },
-    "Cyberint": {
-        "name": "Ronen Naor",
-        "email": "ronenn@checkpoint.com"
-    },
-    "Avanan": {
-        "name": "Shachar Aharon",
-        "email": "shachara@checkpoint.com"
-    },
-    "SASE": {
-        "name": "Nati Aviv",
-        "email": "natia@checkpoint.com"
-    },
-    "FWaaS": {
-        "name": "Menahem Ovrutski",
-        "email": "menahemo@checkpoint.com"
-    }
-}
+PRODUCT_DEVOPS = json.loads(os.environ["PRODUCT_DEVOPS_MAP"])
 
 # Product-SCM Type Mapping - All products use GitHub
 PRODUCT_SCM_TYPE = {
@@ -76,7 +49,7 @@ PRODUCT_JFROG_PROJECT = {
 }
 
 # JFrog API Configuration
-JFROG_BASE_URL = "https://cpart.jfrog.io"
+JFROG_BASE_URL = os.environ["JFROG_BASE_URL"]
 
 
 # Product-JFrog Token Mapping
@@ -117,8 +90,6 @@ PRODUCT_SONAR_PREFIX = {
 }
 
 # Helper functions for token management
-import os
-
 def get_jfrog_token_for_product(product_name: str) -> tuple[str, str]:
     """
     Get the JFrog token for a specific product.

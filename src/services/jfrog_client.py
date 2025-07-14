@@ -12,31 +12,20 @@ class JfrogClient:
     Handles build information and CI status fetching
     """
     
-    def __init__(self, access_token: str):
+    def __init__(self, access_token: str, base_url: str = None):
         """
         Initialize JFrog client
         
         Args:
             access_token (str): JFrog API access token
         """
-        # Import constants for base URL
-        try:
-            from CONSTANTS import JFROG_BASE_URL
-        except ImportError:
-            import sys
-            import os
-            sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-            from CONSTANTS import JFROG_BASE_URL
-        
+        import os
         self.access_token = access_token
-        self.base_url = JFROG_BASE_URL.rstrip('/')
+        self.base_url = (base_url or os.environ["JFROG_BASE_URL"]).rstrip('/')
         self.headers = {
             'Authorization': f'Bearer {access_token}',
             'Content-Type': 'application/json'
         }
-        
-        import logging
-        logger = logging.getLogger(__name__)
         logger.info("JfrogClient initialized with base URL: %s", self.base_url)
     
     def test_connection(self) -> bool:

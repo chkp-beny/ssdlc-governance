@@ -14,23 +14,22 @@ class DataLoader:
     Contains clients for Compass, JFrog, and Sonar APIs
     """
     
-    def __init__(self, compass_token: str, compass_url: str, 
-                 jfrog_token: Optional[str] = None, jfrog_url: Optional[str] = None,
-                 sonar_token: Optional[str] = None, sonar_url: Optional[str] = None):
+    def __init__(self, compass_token: str = None, jfrog_token: Optional[str] = None, sonar_token: Optional[str] = None):
         """
         Initialize DataLoader with API clients
         
         Args:
             compass_token (str): Compass API access token
-            compass_url (str): Compass API base URL
             jfrog_token (str, optional): JFrog API access token
-            jfrog_url (str, optional): JFrog API base URL
             sonar_token (str, optional): Sonar API access token
-            sonar_url (str, optional): Sonar API base URL
         """
+        import os
         from src.services.compass_client import CompassClient
         from src.services.jfrog_client import JfrogClient
         from src.services.sonar_client import SonarClient
+        compass_url = os.environ["COMPASS_BASE_URL"]
+        jfrog_url = os.environ["JFROG_BASE_URL"]
+        sonar_url = os.environ["SONAR_BASE_URL"]
         self.compass_client = CompassClient(compass_token, compass_url)
         self.jfrog_client = JfrogClient(jfrog_token) if jfrog_token else None
         self.sonar_client = SonarClient(sonar_token, sonar_url) if sonar_token and sonar_url else None

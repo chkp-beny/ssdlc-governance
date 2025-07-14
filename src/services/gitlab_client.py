@@ -3,7 +3,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-GITLAB_BASE_URL = "https://gitlab.ngen.checkpoint.com"
+import os
+GITLAB_BASE_URL = os.environ["GITLAB_BASE_URL"]
 
 class GitlabClient:
     def __init__(self, token: str):

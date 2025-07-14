@@ -11,16 +11,17 @@ class CompassClient:
     Handles repository data, vulnerabilities, and CI status fetching
     """
     
-    def __init__(self, access_token: str, base_url: str):
+    def __init__(self, access_token: str, base_url: str = None):
         """
         Initialize Compass client
         
         Args:
             access_token (str): API access token
-            base_url (str): Base URL for Compass API
+            base_url (str): Base URL for Compass API (optional, will use env if not provided)
         """
         self.access_token = access_token
-        self.base_url = base_url.rstrip('/')  # Remove trailing slash
+        import os
+        self.base_url = (base_url or os.environ["COMPASS_BASE_URL"]).rstrip('/')  # Remove trailing slash
         self.headers = {
             'Authorization': f'Bearer {access_token}',
             'Content-Type': 'application/json'

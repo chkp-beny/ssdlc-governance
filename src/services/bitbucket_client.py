@@ -8,7 +8,10 @@ class BitbucketClient:
     """
     Client for Bitbucket Server REST API for repo owner detection.
     """
-    BASE_URL = "https://bitbucket.dev-services.cyberint.io"
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    BASE_URL = os.environ["BITBUCKET_BASE_URL"]
 
     def __init__(self, token: str):
         self.token = token

@@ -8,16 +8,17 @@ class SonarClient:
     Handles code quality metrics
     """
     
-    def __init__(self, access_token: str, base_url: str):
+    def __init__(self, access_token: str, base_url: str = None):
         """
         Initialize Sonar client
         
         Args:
             access_token (str): API access token
-            base_url (str): Base URL for Sonar API
+            base_url (str): Base URL for Sonar API (optional, will use env if not provided)
         """
         self.access_token = access_token
-        self.base_url = base_url
+        import os
+        self.base_url = base_url or os.environ["SONAR_BASE_URL"]
         
         logger.info("SonarClient initialized")
     
