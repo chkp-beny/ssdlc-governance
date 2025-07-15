@@ -1,0 +1,128 @@
+---
+config:
+  layout: dagre
+---
+flowchart LR
+ subgraph SCM_LOGIC["SCM LOGIC"]
+    direction LR
+        a1["Fetch repos"]
+        a2["Get repo owners"]
+        a3["Get org hierarchy"]
+  end
+ subgraph JFROG_CI["JFrog CI"]
+    direction LR
+        b1["Fetch unique build names"]
+        b2{"New build<br>occurred?"}
+        b3["Cache latest build info"]
+        b4["Find source repo field"]
+        b5{"Source repo<br>found?"}
+        b6["Fallback to<br>alternative logic"]
+        b7["Update JFrog CI status"]
+  end
+ subgraph SONAR_CI["Sonar CI"]
+    direction LR
+        s1["Fetch Sonar Projects"]
+        s2["Map project to repo"]
+        s3["Update Sonar CI status"]
+  end
+ subgraph CI_STATUS["CI STATUS"]
+    direction TB
+        JFROG_CI
+        SONAR_CI
+  end
+ subgraph DEP_VULN["Dependencies Vulnerabilities"]
+    direction LR
+        d1["Get artifacts<br>with CVEs counts"]
+        d2{"Is cache<br>exist?"}
+        d3["Fetch cache"]
+        d4{"Is artifact<br>exist?"}
+        d5["Fetch artifact info"]
+        d6["Map artifacts<br>to repos"]
+        d7["Update Dependencies<br>Vulnerabilities"]
+  end
+ subgraph CODE_ISSUES["Code Issues"]
+    direction LR
+        c1["Fetch organization<br>code issues"]
+        c2["Map projects<br>to repos"]
+        c3["Update Code Issues"]
+  end
+ subgraph VULNS["VULNERABILITIES"]
+    direction TB
+        DEP_VULN
+        CODE_ISSUES
+  end
+    a1 -.-> compassClient1(["Compass Client"])
+    a2 -.-> scmClient(["SCM Client"])
+    a3 -.-> hrdbClient(["HR-DB Client"])
+    b1 -.-> jfrogClient1(["JFrog Client"])
+    d3 -.-> jfrogClient2(["JFrog Client"])
+    d5 -.-> jfrogClient3(["JFrog Client"])
+    s1 -.-> compassClient2(["Compass Client"])
+    d1 -.-> compassClient3(["Compass Client"])
+    c1 -.-> sonarClient(["Sonar Client"])
+    a1 --> a2
+    a2 --> a3
+    a3 --> b1
+    b1 --> b2
+    b2 -- Yes --> b3
+    b3 --> b4
+    b2 -- No --> b4
+    b4 --> b5
+    b5 -- Yes --> b7
+    b5 -- No --> b6
+    b6 --> b7
+    b7 --> s1
+    s1 --> s2
+    s2 --> s3
+    s3 --> d1
+    d1 --> d2
+    d2 -- No --> d3
+    d3 --> d4
+    d2 -- Yes --> d4
+    d4 -- No --> d5
+    d5 --> d6
+    d4 -- Yes --> d6
+    d6 --> d7
+    d7 --> c1
+    c1 --> c2
+    c2 --> c3
+    c3 --> f1["Aggregate data &amp;<br>create Product Object"]
+     a1:::scm
+     a2:::scm
+     a3:::scm
+     b1:::ci
+     b2:::decision
+     b3:::ci
+     b4:::ci
+     b5:::decision
+     b6:::ci
+     b7:::ci
+     s1:::ci
+     s2:::ci
+     s3:::ci
+     d1:::vuln
+     d2:::decision
+     d3:::vuln
+     d4:::decision
+     d5:::vuln
+     d6:::vuln
+     d7:::vuln
+     c1:::vuln
+     c2:::vuln
+     c3:::vuln
+     compassClient1:::client
+     scmClient:::client
+     hrdbClient:::client
+     jfrogClient1:::client
+     jfrogClient2:::client
+     jfrogClient3:::client
+     compassClient2:::client
+     compassClient3:::client
+     sonarClient:::client
+     f1:::aggregate
+    classDef scm fill:#e6f4ff,stroke:#0366d6,stroke-width:2px,color:#000
+    classDef ci fill:#fffbe6,stroke:#d6a403,stroke-width:2px,color:#000
+    classDef vuln fill:#fde6e3,stroke:#db2e18,stroke-width:2px,color:#000
+    classDef decision fill:#fff,stroke:#444,stroke-width:2px,font-weight:bold,color:#000
+    classDef aggregate fill:#e6ffe6,stroke:#038d36,stroke-width:3px,font-weight:bold,color:#000
+    classDef client fill:#f3f4f6,stroke:#6b7280,stroke-width:1px,stroke-dasharray: 5 5,color:#000
