@@ -14,6 +14,64 @@ class HRDBClient:
             logger.error("Failed to load HRDB: %s", e)
             self.df = pd.DataFrame()
 
+    def _get_vp_with_fallback(self, record) -> str:
+        """VP Logic: VP 2 -> VP 1 -> ''"""
+        def is_empty(value):
+            if pd.isna(value):
+                return True
+            str_val = str(value).strip()
+            return str_val == '' or str_val in ['nan', 'NaN']
+        
+        vp2 = record.get('VP 2', '')
+        if not is_empty(vp2):
+            return str(vp2).strip()
+        
+        vp1 = record.get('VP 1', '')
+        if not is_empty(vp1):
+            return str(vp1).strip()
+        
+        return ''
+
+    def _get_director_with_fallback(self, record) -> str:
+        """Director Logic: Director -> Sr. Manager (GM/CM) -> ''"""
+        def is_empty(value):
+            if pd.isna(value):
+                return True
+            str_val = str(value).strip()
+            return str_val == '' or str_val in ['nan', 'NaN']
+        
+        director = record.get('Director', '')
+        if not is_empty(director):
+            return str(director).strip()
+        
+        sr_manager = record.get('Sr. Manager (GM/CM)', '')
+        if not is_empty(sr_manager):
+            return str(sr_manager).strip()
+        
+        return ''
+
+    def _get_group_manager_with_fallback(self, record) -> str:
+        """Group Manager Logic: Sr. Manager (GM/CM) -> Manager 2 -> Manager -> ''"""
+        def is_empty(value):
+            if pd.isna(value):
+                return True
+            str_val = str(value).strip()
+            return str_val == '' or str_val in ['nan', 'NaN']
+        
+        sr_manager = record.get('Sr. Manager (GM/CM)', '')
+        if not is_empty(sr_manager):
+            return str(sr_manager).strip()
+        
+        manager2 = record.get('Manager 2', '')
+        if not is_empty(manager2):
+            return str(manager2).strip()
+        
+        manager = record.get('Manager', '')
+        if not is_empty(manager):
+            return str(manager).strip()
+        
+        return ''
+
     def get_user_data(self, username: str) -> Dict[str, Optional[str]]:
         """
         Given a username (e.g., 'simam'), returns a dict with all available HR data:
@@ -36,20 +94,6 @@ class HRDBClient:
         if not row.empty:
             record = row.iloc[0]
             
-            # Handle VP with fallback logic: VP1 -> VP2 if VP1 is missing/NaN
-            vp1 = record.get('VP 1', '')
-            vp2 = record.get('VP 2', '')
-            
-            # Check if VP1 is valid (not NaN, not empty)
-            if pd.isna(vp1) or str(vp1).strip() in ['', 'nan', 'NaN']:
-                # Fall back to VP2 if VP1 is missing
-                if pd.isna(vp2) or str(vp2).strip() in ['', 'nan', 'NaN']:
-                    vp_value = ''
-                else:
-                    vp_value = str(vp2).strip()
-            else:
-                vp_value = str(vp1).strip()
-            
             # Helper function to safely convert and handle NaN values
             def safe_str(value):
                 if pd.isna(value):
@@ -57,13 +101,14 @@ class HRDBClient:
                 str_val = str(value).strip()
                 return '' if str_val in ['nan', 'NaN'] else str_val
             
+            # Use fallback functions for hierarchy fields
             return {
-                'general_manager': safe_str(record.get('Sr. Manager (GM/CM)', '')),
-                'vp': vp_value,
+                'general_manager': self._get_group_manager_with_fallback(record),
+                'vp': self._get_vp_with_fallback(record),
                 'title': safe_str(record.get('Title', '')),
                 'department': safe_str(record.get('Department Desc', '')),
                 'manager_name': safe_str(record.get('Manager Name', '')),
-                'director': safe_str(record.get('Director', '')),
+                'director': self._get_director_with_fallback(record),
                 'vp2': safe_str(record.get('VP 2', '')),
                 'c_level': safe_str(record.get('C Level', '')),
                 'worker_id': safe_str(record.get('Worker ID', '')),

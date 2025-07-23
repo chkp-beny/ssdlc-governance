@@ -173,35 +173,26 @@ class Repo:
     def get_primary_owner_dict(self) -> dict:
         """
         Returns the first owner dict in repo_owners with fallback logic.
-        Applies title exclusion logic - skips owners with excluded titles.
-        Handles 3 cases:
-        1. SCM username exists but not in HRDB -> return SCM username + note
-        2. No repo owners -> DevOps fallback + note  
-        3. No repo owners + no DevOps mapping -> unknown + note
-        4. All owners have excluded titles -> DevOps fallback, then first owner as last resort
+        Applies title exclusion logic and skips owners not found in HRDB.
+        Handles cases:
+        1. No repo owners -> DevOps fallback + note  
+        2. All owners not found in HRDB or have excluded titles -> DevOps fallback + note
+        3. No DevOps mapping -> unknown + note
         """
         from CONSTANTS import EXCLUDED_OWNER_TITLES
         
-        # Case 2 Priority: SCM username exists but not in HRDB
+        # Case: We have repo owners - search for suitable candidate
         if self.repo_owners and len(self.repo_owners) > 0:
-            # Try to find a non-excluded owner, iterate through sorted list
             selected_owner = None
-            first_owner = self.repo_owners[0]  # Keep track of first owner as fallback
-            all_owners_excluded = True
             
             for owner in self.repo_owners:
                 if owner and owner.get('name'):
-                    # Check if HRDB info is missing (all key fields are unknown)
+                    # Check if HRDB info is missing (not found in HRDB)
                     if self._is_hrdb_info_missing(owner):
-                        # For SCM-only users, we don't apply title exclusion since title is 'unknown'
-                        self.add_note("SCM username can not be found in HRDB")
-                        return {
-                            'name': owner['name'],  # Raw username without @checkpoint.com in email method
-                            'title': 'unknown',
-                            'general_manager': 'unknown', 
-                            'vp': 'unknown',
-                            'director': 'unknown'
-                        }
+                        # Skip owners not found in HRDB - continue searching
+                        logger.info("Skipped owner %s - not found in HRDB", 
+                                  owner.get('name', 'unknown'))
+                        continue
                     else:
                         # Owner found in HRDB - check title exclusion
                         owner_title = owner.get('title', '').strip()
@@ -210,51 +201,47 @@ class Repo:
                                       owner.get('name', 'unknown'), owner_title)
                             continue  # Skip this owner, try next one
                         else:
-                            # Found a suitable owner
+                            # Found a suitable owner - current employee with valid title
                             selected_owner = owner
-                            all_owners_excluded = False
                             break
             
             # If we found a suitable owner, return it
             if selected_owner:
                 return selected_owner
             
-            # If all owners were excluded, try DevOps fallback first
-            if all_owners_excluded and first_owner and first_owner.get('name'):
-                if not self._is_hrdb_info_missing(first_owner):
-                    # Try DevOps fallback for excluded titles
-                    devops_info = self._get_devops_fallback()
-                    if devops_info:
-                        self.add_note("All owners have excluded titles, used DevOps fallback")
-                        return devops_info
-                    else:
-                        # Last resort - use first owner even if excluded
-                        logger.info("All owners have excluded titles, no DevOps fallback available, using first owner: %s (%s)", 
-                                  first_owner.get('name', 'unknown'), 
-                                  first_owner.get('title', 'unknown'))
-                        return first_owner
+            # No suitable owner found - all were either not in HRDB or had excluded titles
+            # Try DevOps fallback
+            devops_info = self._get_devops_fallback()
+            if devops_info:
+                self.add_note("All repo owners not found in HRDB or have excluded titles, used DevOps fallback")
+                return devops_info
+            else:
+                # No DevOps fallback available - use unknown
+                self.add_note("All repo owners not found in HRDB or have excluded titles, no DevOps fallback available")
+                return self._get_empty_owner_dict()
         
-        # Case 1: No repo owners - try DevOps fallback
+        # Case: No repo owners at all - try DevOps fallback
         devops_info = self._get_devops_fallback()
         if devops_info:
             self.add_note("Ownership can not be decided, used ownership fallback")
             return devops_info
         else:
-            # Case 3: No DevOps mapping available
+            # No DevOps mapping available
             self.add_note("Ownership can not be decided, no fallback for this app")
-            return {
-                'name': 'unknown',
-                'title': 'unknown', 
-                'general_manager': 'unknown',
-                'vp': 'unknown',
-                'director': 'unknown'
-            }
+            return self._get_empty_owner_dict()
 
     def _is_hrdb_info_missing(self, owner: dict) -> bool:
-        """Check if all HRDB fields are unknown"""
-        return (owner.get('general_manager') == 'unknown' and 
-                owner.get('vp') == 'unknown' and 
-                owner.get('title') == 'unknown')
+        """Check if all HRDB fields are empty, None, or 'unknown' (user not found in HRDB)"""
+        def is_empty_or_unknown(value):
+            return (value is None or 
+                    value == '' or 
+                    value == 'unknown' or 
+                    (isinstance(value, str) and value.strip() in ['', 'unknown']))
+        
+        return (is_empty_or_unknown(owner.get('general_manager')) and 
+                is_empty_or_unknown(owner.get('vp')) and 
+                is_empty_or_unknown(owner.get('title')) and
+                is_empty_or_unknown(owner.get('director')))
 
     def _get_devops_fallback(self) -> Optional[dict]:
         """Get DevOps info and query HRDB once for all fields"""
@@ -281,15 +268,13 @@ class Repo:
 
     def get_primary_owner_email(self) -> str:
         """
-        Returns the email of the first repo owner, handling Case 2 special logic.
+        Returns the email of the primary repo owner.
+        Since get_primary_owner_dict() now skips users not found in HRDB,
+        we always add @checkpoint.com for valid users.
         """
         owner = self.get_primary_owner_dict()
-        if owner and owner.get('name'):
-            # Check if this is Case 2 (SCM username not in HRDB) by checking if all HRDB fields are unknown
-            if self._is_hrdb_info_missing(owner):
-                return owner['name']  # Return raw username without @checkpoint.com
-            else:
-                return f"{owner['name']}@checkpoint.com"
+        if owner and owner.get('name') and owner.get('name') != 'unknown':
+            return f"{owner['name']}@checkpoint.com"
         return "unknown"
 
     def get_primary_owner_general_manager(self) -> str:
@@ -327,3 +312,13 @@ class Repo:
         if owner and owner.get('director'):
             return owner['director']
         return "unknown"
+    
+    @staticmethod
+    def _get_empty_owner_dict():
+        return {
+            'name': 'unknown',
+            'title': 'unknown',
+            'general_manager': 'unknown',
+            'vp': 'unknown',
+            'director': 'unknown'
+        }
