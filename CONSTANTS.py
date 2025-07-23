@@ -12,8 +12,11 @@ PILLAR_PRODUCTS = {
 # Product-DevOps Mapping
 PRODUCT_DEVOPS = json.loads(os.environ["PRODUCT_DEVOPS_MAP"])
 
+# Excluded Owner Titles - Skip owners with these titles when selecting primary owner
+EXCLUDED_OWNER_TITLES = ["Group Manager", "Architect", "Technology Leader", "Director, Email Security Area"]
+
 # Product-SCM Type Mapping - All products use GitHub
-PRODUCT_SCM_TYPE = {
+PRODUCT_SCM_TYPE = {    
     "Datatube": "github",
     "Policy Insights": "github", 
     "SaaS": "gitlab",

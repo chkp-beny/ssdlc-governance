@@ -27,7 +27,7 @@ class ProductReport:
             scm_type = PRODUCT_SCM_TYPE.get(pname, "github")
             org_id = PRODUCT_ORGANIZATION_ID.get(pname, "0")
             devops_info = PRODUCT_DEVOPS.get(pname)
-            devops = DevOps(devops_info["name"], devops_info["email"]) if devops_info else None
+            devops = DevOps(devops_info["name"], f"{devops_info['user_name']}@checkpoint.com") if devops_info else None
             product = Product(pname, scm_type, org_id, devops)
             product.load_repositories()
             product.load_ci_data()

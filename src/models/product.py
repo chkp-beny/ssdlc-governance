@@ -186,8 +186,8 @@ class Product:
             logger.warning("No GitHub repositories found for owner detection in product '%s'", self.name)
             return
 
-        # Batch fetch reviewers for all repos in chunks of 100
-        batch_size = 50
+        # Batch fetch reviewers for all repos in chunks of 30
+        batch_size = 30
         reviewers_by_repo = {}
 
         for i in range(0, len(repo_names), batch_size):
@@ -224,12 +224,20 @@ class Product:
                     normalized_username = username[len('chkp-'):]
                 else:
                     normalized_username = username
-                hr_info = hrdb_client.get_manager_vp(normalized_username)
+                hr_info = hrdb_client.get_user_data(normalized_username)
                 enriched_owners.append({
                     'name': normalized_username,
                     'review_count': review_count,
                     'general_manager': hr_info.get('general_manager'),
-                    'vp': hr_info.get('vp')
+                    'vp': hr_info.get('vp'),
+                    'title': hr_info.get('title'),
+                    'department': hr_info.get('department'),
+                    'manager_name': hr_info.get('manager_name'),
+                    'director': hr_info.get('director'),
+                    'vp2': hr_info.get('vp2'),
+                    'c_level': hr_info.get('c_level'),
+                    'worker_id': hr_info.get('worker_id'),
+                    'full_name': hr_info.get('full_name')
                 })
             repo.repo_owners = enriched_owners
 
@@ -255,12 +263,20 @@ class Product:
         for owner in owners:
             username = owner.get('username')
             access_level = owner.get('access_level')
-            hr_info = hrdb_client.get_manager_vp(username)
+            hr_info = hrdb_client.get_user_data(username)
             enriched_owners.append({
                 'name': username,
                 'access_level': access_level,
                 'general_manager': hr_info.get('general_manager'),
-                'vp': hr_info.get('vp')
+                'vp': hr_info.get('vp'),
+                'title': hr_info.get('title'),
+                'department': hr_info.get('department'),
+                'manager_name': hr_info.get('manager_name'),
+                'director': hr_info.get('director'),
+                'vp2': hr_info.get('vp2'),
+                'c_level': hr_info.get('c_level'),
+                'worker_id': hr_info.get('worker_id'),
+                'full_name': hr_info.get('full_name')
             })
 
         # Sorting logic (case-insensitive for vp)
@@ -322,12 +338,20 @@ class Product:
 
         repo.repo_owners = []
         for username, review_count in top_reviewers:
-            hr_info = hrdb_client.get_manager_vp(username)
+            hr_info = hrdb_client.get_user_data(username)
             repo.repo_owners.append({
                 'name': username,
                 'review_count': review_count,
                 'general_manager': hr_info['general_manager'],
-                'vp': hr_info['vp']
+                'vp': hr_info['vp'],
+                'title': hr_info.get('title'),
+                'department': hr_info.get('department'),
+                'manager_name': hr_info.get('manager_name'),
+                'director': hr_info.get('director'),
+                'vp2': hr_info.get('vp2'),
+                'c_level': hr_info.get('c_level'),
+                'worker_id': hr_info.get('worker_id'),
+                'full_name': hr_info.get('full_name')
             })
     
     def load_ci_data(self):

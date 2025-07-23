@@ -9,8 +9,8 @@ from datetime import datetime
 class TestingReport(ProductReport):
     report_type = "testing"
     columns = [
-        'product', 'scm', 'repo_name', 'repo_type',
-        'repo_owner', 'general_manager', 'vp',
+        'product', 'scm', 'repo_name',
+        'repo_owner', 'group_manager', 'director', 'vp',
         'status_scan_dependencies_jfrog', 'map_build_names_to_method',
         'status_build_names_jfrog', 'status_scan_sast_sonar',
         'repo_publish_artifacts_type',
@@ -21,7 +21,8 @@ class TestingReport(ProductReport):
         'critical_code_secrets_sonar',
         'prevent_on_code_push_to_scm',
         'prevent_on_artifact_push_to_registry',
-        'prevent_on_artifact_pull_from_registry'
+        'prevent_on_artifact_pull_from_registry',
+        'notes'
     ]
     output_format = "csv"
 
@@ -30,9 +31,9 @@ class TestingReport(ProductReport):
         data['product'] = product_name
         data['scm'] = PRODUCT_SCM_TYPE.get(product_name, 'unknown')
         data['repo_name'] = getattr(repo, 'get_repository_name', lambda: 'unknown')()
-        data['repo_type'] = "unhandled yet"
         data['repo_owner'] = repo.get_primary_owner_email() if hasattr(repo, 'get_primary_owner_email') else "unknown"
-        data['general_manager'] = repo.get_primary_owner_general_manager() if hasattr(repo, 'get_primary_owner_general_manager') else "unknown"
+        data['group_manager'] = repo.get_primary_owner_general_manager() if hasattr(repo, 'get_primary_owner_general_manager') else "unknown"
+        data['director'] = repo.get_primary_owner_director() if hasattr(repo, 'get_primary_owner_director') else "unknown"
         data['vp'] = repo.get_primary_owner_vp() if hasattr(repo, 'get_primary_owner_vp') else "unknown"
         # JFrog/CI status
         data['status_scan_dependencies_jfrog'] = False
@@ -77,12 +78,12 @@ class TestingReport(ProductReport):
             if hasattr(vuln, 'dependencies_vulns') and vuln.dependencies_vulns:
                 deps_vuln = vuln.dependencies_vulns
                 jfrog_status = getattr(getattr(repo, 'ci_status', None), 'jfrog_status', None)
-                if jfrog_status:
+                if jfrog_status and jfrog_status.is_exist:
                     data['critical_dependencies_vulnerabilities_jfrog'] = deps_vuln.critical_count
                     data['high_dependencies_vulnerabilities_jfrog'] = deps_vuln.high_count
                 else:
-                    data['critical_dependencies_vulnerabilities_jfrog'] = 0
-                    data['high_dependencies_vulnerabilities_jfrog'] = 0
+                    data['critical_dependencies_vulnerabilities_jfrog'] = "Not Integrated"
+                    data['high_dependencies_vulnerabilities_jfrog'] = "Not Integrated"
                 deployed_artifacts_data = {}
                 if hasattr(deps_vuln, 'artifacts') and deps_vuln.artifacts:
                     for artifact in deps_vuln.artifacts:
@@ -97,8 +98,14 @@ class TestingReport(ProductReport):
                 data['deployed_artifacts_dependencies_vulnerabilities'] = json.dumps(deployed_artifacts_data)
             if hasattr(vuln, 'code_issues') and vuln.code_issues:
                 code_issues = vuln.code_issues
-                data['critical_code_secrets_sonar'] = code_issues.get_secrets_count() if hasattr(code_issues, 'get_secrets_count') else 0
-                data['critical_code_vulnerabilities_sonar'] = code_issues.get_critical_vulnerability_count() if hasattr(code_issues, 'get_critical_vulnerability_count') else 0
+                sonar_status = getattr(getattr(repo, 'ci_status', None), 'sonar_status', None)
+                if sonar_status and sonar_status.is_exist:
+                    data['critical_code_secrets_sonar'] = code_issues.get_secrets_count() if hasattr(code_issues, 'get_secrets_count') else 0
+                    data['critical_code_vulnerabilities_sonar'] = code_issues.get_critical_vulnerability_count() if hasattr(code_issues, 'get_critical_vulnerability_count') else 0
+                else:
+                    data['critical_code_secrets_sonar'] = "Not Integrated"
+                    data['critical_code_vulnerabilities_sonar'] = "Not Integrated"
+        data['notes'] = repo.get_notes_display()
         return data
 
     def generate_report(self, output_dir: str) -> str:

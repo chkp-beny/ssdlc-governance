@@ -64,6 +64,7 @@ reports/
 # HRDB CSV files
 HRDB.csv
 HRDB*.csv
+data/HROPS-3719.csv
 
 # Raw API Responses and Instructions
 instructions_and_api_responses/
