@@ -1,4 +1,5 @@
 from .product_report import ProductReport
+from .app_status_report import AppStatusReport
 from CONSTANTS import PILLAR_PRODUCTS, PRODUCT_SCM_TYPE
 
 
@@ -77,3 +78,66 @@ class ManagerReport(ProductReport):
         # If SonarQube integrated but no vulnerabilities, keep default 0 values
         data['notes'] = repo.get_notes_display()
         return data
+
+    def generate_report(self, output_dir: str) -> str:
+        """
+        Generate manager report with both DATA and App Status sheets.
+        """
+        from datetime import datetime
+        import os
+        
+        # Collect all repository data
+        all_rows = []
+        for product in self.load_all_products():
+            for repo in product.repos:
+                all_rows.append(self.extract_repo_data(repo, product.name))
+        
+        if not all_rows:
+            print("No data to report.")
+            return ""
+        
+        if self.output_format == "xlsx":
+            # Excel with multiple sheets
+            xlsx_filename = f"{self.report_type}_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            xlsx_path = os.path.join(output_dir, xlsx_filename)
+            
+            try:
+                import pandas as pd
+                from openpyxl import Workbook
+                
+                # Create workbook
+                workbook = Workbook()
+                
+                # Remove default sheet
+                workbook.remove(workbook.active)
+                
+                # Create DATA sheet (detailed report)
+                df = pd.DataFrame(all_rows)
+                df = df[self.columns]
+                
+                with pd.ExcelWriter(xlsx_path, engine='openpyxl') as writer:
+                    df.to_excel(writer, sheet_name='DATA', index=False)
+                
+                # Reopen to add App Status sheet
+                from openpyxl import load_workbook
+                workbook = load_workbook(xlsx_path)
+                
+                # Create App Status sheet
+                app_status_report = AppStatusReport(all_rows)
+                app_status_report.export_to_excel(workbook, "App Status")
+                
+                # Save the workbook with both sheets
+                workbook.save(xlsx_path)
+                
+                print(f"✅ Generated XLSX file with DATA and App Status sheets: {xlsx_path}")
+                return xlsx_path
+                
+            except ImportError as e:
+                print(f"❌ Missing required dependencies for XLSX generation: {e}")
+                return ""
+            except Exception as e:
+                print(f"❌ Error generating XLSX file: {e}")
+                return ""
+        else:
+            # Fall back to parent implementation for other formats
+            return super().generate_report(output_dir)
