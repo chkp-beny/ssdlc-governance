@@ -213,11 +213,11 @@ class Repo:
             # Try DevOps fallback
             devops_info = self._get_devops_fallback()
             if devops_info:
-                self.add_note("All repo owners not found in HRDB or have excluded titles, used DevOps fallback")
+                self.add_note("All repo owners not found in HRDB or have excluded titles, used ownership fallback")
                 return devops_info
             else:
                 # No DevOps fallback available - use unknown
-                self.add_note("All repo owners not found in HRDB or have excluded titles, no DevOps fallback available")
+                self.add_note("All repo owners not found in HRDB or have excluded titles, no ownership fallback available")
                 return self._get_empty_owner_dict()
         
         # Case: No repo owners at all - try DevOps fallback
