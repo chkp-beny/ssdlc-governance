@@ -15,7 +15,7 @@ class HRDBClient:
             self.df = pd.DataFrame()
 
     def _get_vp_with_fallback(self, record) -> str:
-        """VP Logic: VP 2 -> VP 1 -> ''"""
+        """VP Logic: VP 2 -> VP 1 -> C Level -> ''"""
         def is_empty(value):
             if pd.isna(value):
                 return True
@@ -29,6 +29,10 @@ class HRDBClient:
         vp1 = record.get('VP 1', '')
         if not is_empty(vp1):
             return str(vp1).strip()
+        
+        c_level = record.get('C Level', '')
+        if not is_empty(c_level):
+            return str(c_level).strip()
         
         return ''
 

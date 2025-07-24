@@ -13,7 +13,7 @@ PILLAR_PRODUCTS = {
 PRODUCT_DEVOPS = json.loads(os.environ["PRODUCT_DEVOPS_MAP"])
 
 # Excluded Owner Titles - Skip owners with these titles when selecting primary owner
-EXCLUDED_OWNER_TITLES = ["Group Manager", "Architect", "Technology Leader", "Director, Email Security Area"]
+EXCLUDED_OWNER_TITLES = ["Group Manager", "Architect", "Technology Leader", "Director, Email Security Area", "Group Manager, DevOps", "Architect, SASE Network"]
 
 # Product-SCM Type Mapping - All products use GitHub
 PRODUCT_SCM_TYPE = {    
