@@ -55,7 +55,7 @@ class HRDBClient:
         return ''
 
     def _get_group_manager_with_fallback(self, record) -> str:
-        """Group Manager Logic: Sr. Manager (GM/CM) -> Manager 2 -> Manager -> ''"""
+        """Group Manager Logic: Sr. Manager (GM/CM) -> Manager 2 -> Manager Name -> ''"""
         def is_empty(value):
             if pd.isna(value):
                 return True
@@ -70,9 +70,9 @@ class HRDBClient:
         if not is_empty(manager2):
             return str(manager2).strip()
         
-        manager = record.get('Manager', '')
-        if not is_empty(manager):
-            return str(manager).strip()
+        manager_name = record.get('Manager Name', '')
+        if not is_empty(manager_name):
+            return str(manager_name).strip()
         
         return ''
 

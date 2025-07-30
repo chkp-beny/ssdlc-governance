@@ -1,6 +1,6 @@
 from .product_report import ProductReport
 from .app_status_report import AppStatusReport
-from CONSTANTS import PILLAR_PRODUCTS, PRODUCT_SCM_TYPE
+from CONSTANTS import PILLAR_PRODUCTS, PRODUCT_SCM_TYPE, PRODUCT_SCM_INSTANCE
 
 
 class ManagerReport(ProductReport):
@@ -22,7 +22,7 @@ class ManagerReport(ProductReport):
     def extract_repo_data(self, repo, product_name: str) -> dict:
         data = {col: "unhandled yet" for col in self.columns}
         data['product'] = product_name
-        data['scm'] = PRODUCT_SCM_TYPE.get(product_name, 'unknown')
+        data['scm'] = PRODUCT_SCM_INSTANCE.get(product_name, '')
         # Pillar
         product_pillar = 'unhandled yet'
         for pillar, products in PILLAR_PRODUCTS.items():

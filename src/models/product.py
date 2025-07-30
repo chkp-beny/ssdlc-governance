@@ -1397,8 +1397,6 @@ class Product:
         low_count = vulnerabilities.get('low', 0)
         unknown_count = vulnerabilities.get('unknown', 0)
         
-        # Extract artifact type
-        artifact_type = self._extract_artifact_type(artifact_key)
         return DeployedArtifact(
             artifact_key=artifact_key,
             repo_name=repo_name,
@@ -1407,7 +1405,6 @@ class Product:
             medium_count=medium_count,
             low_count=low_count,
             unknown_count=unknown_count,
-            artifact_type=artifact_type,
             build_name=build_name,
             updated_at=updated_at,
             jfrog_path=jfrog_path,
@@ -1754,26 +1751,6 @@ class Product:
             
         except (ValueError, KeyError, OSError) as e:
             logger.error("Error loading Sonar code issues data for product '%s': %s", self.name, str(e))
-    
-    def _extract_artifact_type(self, artifact_key: str) -> str:
-        """
-        Extract artifact type from artifact key
-        
-        Args:
-            artifact_key (str): Full artifact key
-            
-        Returns:
-            str: Artifact type (docker, npm, maven, etc.)
-        """
-        try:
-            # Extract type before first :// if present
-            if '://' in artifact_key:
-                type_part = artifact_key.split('://')[0]
-                return type_part.lower()
-            else:
-                return 'unknown'
-        except (ValueError, IndexError):
-            return 'unknown'
 
     def get_repos_count(self) -> int:
         """

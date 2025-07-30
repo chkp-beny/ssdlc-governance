@@ -1,3 +1,15 @@
+# Product-SCM Instance Mapping for report presentation
+PRODUCT_SCM_INSTANCE = {
+    "Datatube": "",
+    "Policy Insights": "",
+    "SaaS": "",
+    "Cyberint": "Bitbucket",
+    "Avanan": "GitHub (HEC Private Accounts)",
+    "SASE": "GitHub (H-SASE Private Accounts)",
+    "FWaaS": "GitHub",
+    "Inext": "GitLab Ngen",
+    "CheckpointSW": "GitHub (Checkpoint SW)"
+}
 import os
 import json
 # Pillar-Product Mapping
@@ -6,7 +18,8 @@ PILLAR_PRODUCTS = {
     "Quantum": ["Policy Insights"],
     "Harmony": ["SaaS", "Avanan", "SASE"],
     "CloudGuard": ["FWaaS"],
-    "Inext": ["Inext"]
+    "Inext": ["Inext"],
+    "CheckpointSW": ["CheckpointSW"]
 }
 
 # Product-DevOps Mapping
@@ -24,14 +37,16 @@ PRODUCT_SCM_TYPE = {
     "Avanan": "github",
     "SASE": "github",
     "FWaaS": "github",
-    "Inext": "gitlab"
+    "Inext": "gitlab",
+    "CheckpointSW": "github"
 }
 
 # Product-GitHub Organization Mapping
 # Maps product names to their GitHub organization names
 PRODUCT_SCM_ORG_NAME = {
     "Avanan": "Avanan",
-    "SASE": "perimeter-81"
+    "SASE": "perimeter-81",
+    "CheckpointSW": "CheckpointSW"
 }
 
 # Product-Organization ID Mapping - All organizations use ID 0
@@ -43,7 +58,8 @@ PRODUCT_ORGANIZATION_ID = {
     "Avanan": "3",
     "SASE": "4",
     "FWaaS": "0",
-    "Inext": "5"
+    "Inext": "5",
+    "CheckpointSW": "6"
 }
 
 # Product-JFrog Project Mapping
@@ -84,7 +100,8 @@ PRODUCT_SCM_TOKEN_ENV = {
     "Avanan": "AVANAN_SCM_TOKEN",
     "SASE": "SASE_SCM_TOKEN",
     "FWaaS": "",
-    "Inext": "INEXT_SCM_TOKEN"
+    "Inext": "INEXT_SCM_TOKEN",
+    "CheckpointSW": "CHECKPOINTSW_SCM_TOKEN"
 }
 
 # Product-Sonar Prefix Mapping

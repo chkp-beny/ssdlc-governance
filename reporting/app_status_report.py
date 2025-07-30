@@ -77,8 +77,10 @@ class AppStatusReport:
         """
         total_repos = len(repos)
         
-        # Get SCM type for this product
-        scm_type = repos[0].get('scm', 'unknown') if repos else 'unknown'
+        # Get SCM type for this product and map for presentation
+        scm_raw = repos[0].get('scm', 'unknown') if repos else 'unknown'
+        from CONSTANTS import PRODUCT_SCM_INSTANCE
+        scm_type = PRODUCT_SCM_INSTANCE.get(product, '')
         
         # Calculate Sonar metrics
         sonar_metrics = self._calculate_sonar_metrics(repos, total_repos)
