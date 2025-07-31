@@ -108,7 +108,7 @@ class JfrogClient:
             dict: Build metadata with build numbers and timestamps
         """
         try:
-            logger.info("Fetching build metadata for build: %s in project: %s", build_name, project)
+            logger.info("Fetching build metadata and details for build: %s in project: %s", build_name, project)
             
             # Build the API endpoint
             url = f"{self.base_url}/artifactory/api/build/{build_name}"
@@ -154,8 +154,7 @@ class JfrogClient:
             dict: Detailed build information with properties
         """
         try:
-            logger.info("Fetching build details for build: %s/%s in project: %s", 
-                       build_name, build_number, project)
+            # Build details logging is handled in fetch_build_metadata method
             
             # Build the API endpoint
             url = f"{self.base_url}/artifactory/api/build/{build_name}/{build_number}"

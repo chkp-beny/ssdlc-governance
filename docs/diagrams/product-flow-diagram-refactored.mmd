@@ -1,0 +1,151 @@
+---
+config:
+  layout: dagre
+---
+flowchart LR
+ subgraph PRODUCT["Product"]
+    direction TB
+        p1["Product.load_repositories()"]
+        p2["Product.load_ci_status()"]
+        p3["Product.load_vulnerabilities()"]
+        p4["Product.generate_report()"]
+  end
+ 
+ subgraph REPO_COORD["Repository Coordinator"]
+    direction LR
+        rc1["GitHub Repo Processor"]
+        rc2["Bitbucket Repo Processor"]
+        rc3["Populate repo owners"]
+        rc4["Map to HRDB"]
+  end
+ 
+ subgraph CI_PROC["CI Status Processors"]
+    direction TB
+        subgraph JFROG_CI_PROC["JFrog CI Processor"]
+            jci1["Fetch builds from JFrog"]
+            jci2["Parse build metadata"]
+            jci3["Extract source repo info"]
+            jci4["Match builds to repos"]
+            jci5["Update JFrog CI Status"]
+        end
+        subgraph SONAR_CI_PROC["Sonar CI Processor"]
+            sci1["Fetch Sonar projects"]
+            sci2["Map projects to repos"]
+            sci3["Update Sonar CI Status"]
+        end
+  end
+ 
+ subgraph VULN_PROC["Vulnerability Processors"]
+    direction TB
+        subgraph JFROG_VULN_PROC["JFrog Vulnerability Processor"]
+            jvp1["Fetch vulnerabilities from Compass"]
+            jvp2["Load AQL cache"]
+            jvp3["Parse artifact paths"]
+            jvp4["Extract build names from properties"]
+            jvp5["Match artifacts to repos via build names"]
+            jvp6["Create DeployedArtifact objects"]
+            jvp7["Update Dependencies Vulnerabilities"]
+        end
+        subgraph SONAR_VULN_PROC["Sonar Vulnerability Processor"]
+            svp1["Fetch code issues from Sonar"]
+            svp2["Map projects to repos"]
+            svp3["Update Code Issues"]
+        end
+  end
+ 
+ subgraph CLIENTS["External Clients"]
+    direction TB
+        cc1["Compass Client"]
+        jc1["JFrog Client"]
+        sc1["Sonar Client"]
+        gc1["GitHub Client"]
+        bc1["Bitbucket Client"]
+        hc1["HRDB Client"]
+  end
+ 
+ subgraph DATA_MODELS["Data Models"]
+    direction LR
+        dm1["Repo (SCMInfo, CIStatus, Vulnerabilities)"]
+        dm2["JFrogStatus (matched_build_names)"]
+        dm3["SonarStatus (project mappings)"]
+        dm4["DeployedArtifact (with build metadata)"]
+        dm5["DependenciesVulnerabilities"]
+        dm6["CodeIssues"]
+  end
+
+    %% Product orchestration flow
+    p1 --> REPO_COORD
+    p2 --> CI_PROC
+    p3 --> VULN_PROC
+    
+    %% Repository coordination flow
+    REPO_COORD --> rc1
+    REPO_COORD --> rc2
+    rc1 --> rc3
+    rc2 --> rc3
+    rc3 --> rc4
+    
+    %% CI status processing flow
+    CI_PROC --> jci1
+    jci1 --> jci2
+    jci2 --> jci3
+    jci3 --> jci4
+    jci4 --> jci5
+    
+    CI_PROC --> sci1
+    sci1 --> sci2
+    sci2 --> sci3
+    
+    %% Vulnerability processing flow
+    VULN_PROC --> jvp1
+    jvp1 --> jvp2
+    jvp2 --> jvp3
+    jvp3 --> jvp4
+    jvp4 --> jvp5
+    jvp5 --> jvp6
+    jvp6 --> jvp7
+    
+    VULN_PROC --> svp1
+    svp1 --> svp2
+    svp2 --> svp3
+    
+    %% Client connections
+    rc1 -.-> gc1
+    rc2 -.-> bc1
+    rc4 -.-> hc1
+    jci1 -.-> jc1
+    jvp1 -.-> cc1
+    jvp2 -.-> jc1
+    sci1 -.-> cc1
+    svp1 -.-> sc1
+    
+    %% Data model updates
+    rc4 --> dm1
+    jci5 --> dm2
+    sci3 --> dm3
+    jvp6 --> dm4
+    jvp7 --> dm5
+    svp3 --> dm6
+    
+    %% Final aggregation
+    dm1 --> p4
+    dm2 --> p4
+    dm3 --> p4
+    dm4 --> p4
+    dm5 --> p4
+    dm6 --> p4
+
+    %% Styling
+    classDef product fill:#e6ffe6,stroke:#038d36,stroke-width:3px,font-weight:bold,color:#000
+    classDef coordinator fill:#e6f4ff,stroke:#0366d6,stroke-width:2px,color:#000
+    classDef processor fill:#fffbe6,stroke:#d6a403,stroke-width:2px,color:#000
+    classDef vuln fill:#fde6e3,stroke:#db2e18,stroke-width:2px,color:#000
+    classDef client fill:#f3f4f6,stroke:#6b7280,stroke-width:1px,stroke-dasharray: 5 5,color:#000
+    classDef model fill:#f0e6ff,stroke:#7c3aed,stroke-width:2px,color:#000
+    
+    class p1,p2,p3,p4 product
+    class rc1,rc2,rc3,rc4 coordinator
+    class jci1,jci2,jci3,jci4,jci5,sci1,sci2,sci3 processor
+    class jvp1,jvp2,jvp3,jvp4,jvp5,jvp6,jvp7,svp1,svp2,svp3 vuln
+    class cc1,jc1,sc1,gc1,bc1,hc1 client
+    class dm1,dm2,dm3,dm4,dm5,dm6 model
