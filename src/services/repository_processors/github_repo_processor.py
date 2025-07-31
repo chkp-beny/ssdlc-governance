@@ -2,7 +2,7 @@ import os
 import logging
 from typing import List
 from collections import Counter
-from src.services.hrdb_client import HRDBClient
+from src.services.hrdb_clients.hrdb_client import HRDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class GitHubRepoProcessor:
     def initialize_client(self):
         """Initialize GitHub client with product-specific configuration."""
         try:
-            from src.services.github_client import GitHubClient
+            from src.services.scm_clients.github_client import GitHubClient
             from CONSTANTS import PRODUCT_SCM_TOKEN_ENV, PRODUCT_SCM_ORG_NAME
             
             token_env = PRODUCT_SCM_TOKEN_ENV.get(self.product_name, None)

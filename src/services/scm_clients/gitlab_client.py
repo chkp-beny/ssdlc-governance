@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 import os
 GITLAB_BASE_URL = os.environ["GITLAB_BASE_URL"]
 
-class GitlabClient:
+class GitLabClient:
     def __init__(self, token: str):
         self.token = token
         self.session = requests.Session()

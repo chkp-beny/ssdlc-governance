@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 load_dotenv()
 
 from src.models.product import Product
-from src.services.compass_client import CompassClient
+from src.services.compass_clients.compass_client import CompassClient
 from src.models.vulnerabilities import DeployedArtifact
 from CONSTANTS import PRODUCT_SCM_TYPE, PRODUCT_ORGANIZATION_ID
 

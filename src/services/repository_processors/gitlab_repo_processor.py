@@ -2,7 +2,7 @@ import os
 import logging
 from typing import List
 from collections import Counter
-from src.services.hrdb_client import HRDBClient
+from src.services.hrdb_clients.hrdb_client import HRDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class GitLabRepoProcessor:
     def initialize_client(self):
         """Initialize GitLab client with product-specific configuration."""
         try:
-            from src.services.gitlab_client import GitlabClient
+            from src.services.scm_clients.gitlab_client import GitLabClient
             from CONSTANTS import PRODUCT_SCM_TOKEN_ENV
             
             token_env = PRODUCT_SCM_TOKEN_ENV.get(self.product_name, None)
@@ -37,7 +37,7 @@ class GitLabRepoProcessor:
                 logger.warning("No SCM token found for product '%s', skipping SCM owner detection.", self.product_name)
                 return False
             else:
-                self.gitlab_client = GitlabClient(token)
+                self.gitlab_client = GitLabClient(token)
                 return True
         except ImportError as e:
             logger.error("Failed to import GitLab client: %s", str(e))

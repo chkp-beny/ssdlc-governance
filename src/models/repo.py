@@ -246,7 +246,7 @@ class Repo:
         """Get DevOps info and query HRDB once for all fields"""
         try:
             from CONSTANTS import PRODUCT_DEVOPS
-            from src.services.hrdb_client import HRDBClient
+            from src.services.hrdb_clients.hrdb_client import HRDBClient
             
             devops_map = PRODUCT_DEVOPS.get(self.product_name)
             if devops_map and devops_map.get('user_name'):
