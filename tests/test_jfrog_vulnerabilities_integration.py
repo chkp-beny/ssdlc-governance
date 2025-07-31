@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 load_dotenv()
 
 from src.models.product import Product
-from src.services.data_loader import CompassClient
+from src.services.compass_client import CompassClient
 from src.models.vulnerabilities import DeployedArtifact
 from CONSTANTS import PRODUCT_SCM_TYPE, PRODUCT_ORGANIZATION_ID
 
@@ -148,7 +148,7 @@ class TestJfrogVulnerabilitiesIntegration:
             ("cyberint-docker-virtual/alert-service:latest", "alert-service"),
             ("cyberint-npm-virtual/frontend-service/1.0.0", "frontend-service"),
             ("maven-repo/com/checkpoint/security-service/1.2.3", "security-service"),
-            ("docker://staging/scoring-manager:5f0b0100d1cd1d227d44d6ed35cf7953f062e27a", "scoring-manager"),
+            ("cyberint-docker-local/staging/telegram-loader/30c1aa50c5b8af2c4bb4ba84330a63177bee882e/manifest.json", "telegram-loader"),
             ("simple-service", "simple-service"),
             ("", ""),
         ]
@@ -205,8 +205,8 @@ class TestJfrogVulnerabilitiesIntegration:
             # Create a test artifact with expected vulnerability counts based on your data:
             # docker://staging/scoring-manager:5f0b0100d1cd1d227d44d6ed35cf7953f062e27a	low:641	medium: 353	high:301	critical:76	unknown:84
             test_artifact = DeployedArtifact(
-                artifact_key="docker://staging/scoring-manager:5f0b0100d1cd1d227d44d6ed35cf7953f062e27a",
-                repo_name="scoring-manager",
+                artifact_key="cyberint-docker-local/staging/telegram-loader/30c1aa50c5b8af2c4bb4ba84330a63177bee882e/manifest.json",
+                repo_name="telegram-loader",
                 critical_count=76,
                 high_count=301,
                 medium_count=353,
@@ -268,6 +268,249 @@ class TestJfrogVulnerabilitiesIntegration:
             print("! No scoring-manager artifact found - this might indicate the artifact hasn't been deployed recently")
             # Still pass the test but log the issue
             assert len(artifacts) >= 0, "Should have some artifacts (even if not the specific one)"
+
+
+    def test_debug_vulnerability_matching_issue(self):
+        """Debug the vulnerability matching issue step by step"""
+        print("\n🔍 DEBUGGING VULNERABILITY MATCHING ISSUE")
+        
+        # Get Cyberint constants
+        cyberint_org_id = PRODUCT_ORGANIZATION_ID["Cyberint"]
+        
+        # Get vulnerability processor
+        from src.services.vulnerability_processors.jfrog_vulnerability_processor import JfrogVulnerabilityProcessor
+        vuln_processor = JfrogVulnerabilityProcessor("Cyberint", cyberint_org_id)
+        
+        # Check if we have compass client
+        assert vuln_processor.compass_client is not None, "Should have CompassClient"
+        print("✓ CompassClient initialized")
+        
+        # Fetch vulnerability data from Compass API
+        jfrog_vulnerabilities = vuln_processor.compass_client.fetch_jfrog_vulnerabilities(cyberint_org_id)
+        print(f"✓ Fetched {len(jfrog_vulnerabilities)} vulnerability artifacts from Compass API")
+        
+        # Check a few artifact keys to understand the format
+        print("\n📋 Sample artifact keys:")
+        for i, artifact_key in enumerate(list(jfrog_vulnerabilities.keys())[:5]):
+            print(f"  {i+1}. {artifact_key}")
+        
+        # Get JFrog project and AQL cache directory
+        from CONSTANTS import PRODUCT_JFROG_PROJECT
+        jfrog_project = PRODUCT_JFROG_PROJECT.get("Cyberint", "")
+        print(f"✓ JFrog project: {jfrog_project}")
+        
+        cache_dir = os.path.join(os.path.dirname(__file__), '..', 'build_info_cache_dir')
+        product_cache_dir = os.path.join(cache_dir, jfrog_project)
+        aql_cache_dir = os.path.join(product_cache_dir, "cache_repo_responses")
+        print(f"✓ AQL cache directory: {aql_cache_dir}")
+        
+        # Check what's in the AQL cache directory
+        cache_files = []
+        if os.path.exists(aql_cache_dir):
+            cache_files = [f for f in os.listdir(aql_cache_dir) if f.endswith('.json')]
+            print(f"✓ Found {len(cache_files)} AQL cache files")
+            if cache_files:
+                print("  Sample cache files:")
+                for i, cache_file in enumerate(cache_files[:5]):
+                    print(f"    {i+1}. {cache_file}")
+        else:
+            print("❌ AQL cache directory does not exist!")
+        
+        # Load and examine build name map from JFrog CI processor cache files
+        build_name_map_file = os.path.join(product_cache_dir, "build_name_to_repo_map.json")
+        repo_build_names_map = {}
+        
+        if os.path.exists(build_name_map_file):
+            try:
+                import json
+                with open(build_name_map_file, 'r', encoding='utf-8') as f:
+                    build_name_to_repo_map = json.load(f)
+                print(f"✓ Loaded build name to repo map with {len(build_name_to_repo_map)} entries")
+                
+                # Reverse the mapping: repo_name -> set of build names
+                for build_name, repo_name in build_name_to_repo_map.items():
+                    if repo_name not in repo_build_names_map:
+                        repo_build_names_map[repo_name] = set()
+                    repo_build_names_map[repo_name].add(build_name)
+                    
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                print(f"❌ Error loading build name map: {e}")
+        else:
+            print("❌ Build name to repo map file does not exist!")
+            
+            # Try to create a simple test mapping from the AQL cache data itself
+            print("🔧 Attempting to create test mapping from AQL cache...")
+            if cache_files:
+                try:
+                    import json
+                    with open(os.path.join(aql_cache_dir, cache_files[0]), 'r', encoding='utf-8') as f:
+                        sample_aql_data = json.load(f)
+                    
+                    # Extract build names from AQL data and create simple mapping
+                    build_names_found = set()
+                    results = sample_aql_data.get('results', [])
+                    for result in results[:50]:  # Sample first 50 entries
+                        properties = result.get('properties', [])
+                        for prop in properties:
+                            if prop.get('key') == 'build.name':
+                                full_build_name = prop.get('value', '')
+                                if full_build_name and '/' in full_build_name:
+                                    parts = full_build_name.split('/')
+                                    if len(parts) >= 2:
+                                        extracted_name = parts[1] if len(parts) >= 3 else parts[-1]
+                                        build_names_found.add(extracted_name)
+                                        # Create a simple test mapping
+                                        repo_build_names_map[extracted_name] = {extracted_name}
+                    
+                    print(f"✓ Created test mapping from AQL cache with {len(build_names_found)} build names: {list(build_names_found)[:5]}")
+                    
+                except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+                    print(f"❌ Error creating test mapping: {e}")
+        
+        print(f"✓ Built repository lookup map with {len(repo_build_names_map)} repositories")
+        
+        # Show some repository build names for debugging
+        print("\n🏗️ Sample repositories with build names:")
+        count = 0
+        for repo_name, build_names in repo_build_names_map.items():
+            if count < 5:
+                print(f"  {repo_name}: {list(build_names)}")
+                count += 1
+        
+        # Now test processing a few artifacts manually
+        print("\n🔧 Testing artifact processing:")
+        
+        # Take first 5 artifacts for detailed testing
+        test_artifacts = list(jfrog_vulnerabilities.items())[:5]
+        successful_matches = 0
+        
+        for i, (artifact_key, _) in enumerate(test_artifacts):
+            print(f"\n--- Testing artifact {i+1}: {artifact_key} ---")
+            
+            # Parse artifact manually
+            repo_name = ""
+            path = ""
+            name = ""
+            
+            try:
+                if "://" in artifact_key:
+                    # Handle docker://... format
+                    parts = artifact_key.split("/")
+                    if len(parts) >= 3:
+                        repo_name = parts[1] if len(parts) > 1 else ""
+                        name = parts[-1] if parts else ""
+                        path = "/".join(parts[2:-1]) if len(parts) > 3 else ""
+                else:
+                    # Handle regular path format
+                    parts = artifact_key.split("/")
+                    if len(parts) >= 2:
+                        repo_name = parts[0]
+                        name = parts[-1]
+                        path = "/".join(parts[1:-1]) if len(parts) > 2 else ""
+                        
+                print(f"  Parsed: repo_name='{repo_name}', path='{path}', name='{name}'")
+            except (ValueError, IndexError) as e:
+                print(f"  ❌ Error parsing: {e}")
+                continue
+            
+            # Check if it's a local repo
+            is_local = "local" in repo_name.lower()
+            print(f"  Is local repo: {is_local}")
+            
+            if not is_local:
+                print("  Skipping non-local repository")
+                continue
+            
+            # Check AQL cache
+            aql_cache_file = os.path.join(aql_cache_dir, f"{repo_name}.json")
+            print(f"  AQL cache file: {aql_cache_file}")
+            print(f"  Cache file exists: {os.path.exists(aql_cache_file)}")
+            
+            if os.path.exists(aql_cache_file):
+                try:
+                    import json
+                    with open(aql_cache_file, 'r', encoding='utf-8') as f:
+                        aql_data = json.load(f)
+                    
+                    if aql_data:
+                        results = aql_data.get('results', [])
+                        print(f"  AQL data loaded: {len(results)} results")
+                        
+                        # Look for matching artifacts in AQL data
+                        matches = []
+                        for aql_entry in results:
+                            aql_path = aql_entry.get('path', '')
+                            aql_name = aql_entry.get('name', '')
+                            if aql_path == path and aql_name == name:
+                                # Extract build name from properties
+                                properties = aql_entry.get('properties', [])
+                                for prop in properties:
+                                    if prop.get('key') == 'build.name':
+                                        full_build_name = prop.get('value', '')
+                                        # Extract the build name using the same logic as the processor
+                                        if '/' not in full_build_name:
+                                            extracted_build_name = full_build_name
+                                        else:
+                                            parts = full_build_name.split('/')
+                                            if len(parts) >= 3:
+                                                extracted_build_name = parts[1]  # Middle part
+                                            elif len(parts) == 2:
+                                                extracted_build_name = parts[1]  # Second part
+                                            else:
+                                                extracted_build_name = full_build_name
+                                        matches.append(f"{extracted_build_name} (from: {full_build_name})")
+                        
+                        print(f"  Found {len(matches)} AQL matches with build names: {matches}")
+                        
+                        # Check if any build names match our repository map
+                        repo_matches = []
+                        for build_name in matches:
+                            for project_repo_name, build_names in repo_build_names_map.items():
+                                if build_name in build_names:
+                                    repo_matches.append(project_repo_name)
+                        
+                        print(f"  Repository matches: {repo_matches}")
+                        if repo_matches:
+                            successful_matches += 1
+                    else:
+                        print("  ❌ Failed to load AQL data")
+                except (FileNotFoundError, json.JSONDecodeError) as e:
+                    print(f"  ❌ Error loading AQL cache: {e}")
+            else:
+                print("  ❌ AQL cache file missing")
+        
+        print("\n🎯 DEBUGGING SUMMARY:")
+        print(f"- Fetched {len(jfrog_vulnerabilities)} vulnerability artifacts")
+        print(f"- Found {len(repo_build_names_map)} repositories with build names")
+        print(f"- AQL cache directory: {aql_cache_dir}")
+        print(f"- Cache files available: {len(cache_files)}")
+        print(f"- Successful matches from test artifacts: {successful_matches}/{len(test_artifacts)}")
+        
+        # Show some specific examples to help debug
+        if successful_matches == 0:
+            print("\n❌ NO MATCHES FOUND - Potential issues:")
+            print("1. AQL cache files might not contain the vulnerability artifacts")
+            print("2. Build names in AQL data might not match build names in repo map")
+            print("3. Path/name parsing might be incorrect")
+            
+            # Let's examine one cache file in detail if available
+            if cache_files:
+                sample_cache_file = os.path.join(aql_cache_dir, cache_files[0])
+                try:
+                    with open(sample_cache_file, 'r', encoding='utf-8') as f:
+                        sample_aql_data = json.load(f)
+                    sample_results = sample_aql_data.get('results', [])
+                    if sample_results:
+                        print(f"\n📋 Sample AQL entry from {cache_files[0]}:")
+                        sample_entry = sample_results[0]
+                        print(f"  path: '{sample_entry.get('path', '')}'")
+                        print(f"  name: '{sample_entry.get('name', '')}'")
+                        print(f"  build.name: '{sample_entry.get('build.name', '')}'")
+                except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+                    print(f"  Error examining cache file: {e}")
+        
+        # This test is for debugging, so we don't need to assert anything specific
+        # The goal is to understand why artifacts aren't matching repositories
 
 
 if __name__ == "__main__":

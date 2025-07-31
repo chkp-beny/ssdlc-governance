@@ -80,7 +80,6 @@ class Repo:
             is_production=False  # TODO: implement production detection logic
         )
 
-        logger.info("Successfully created Repo object for: %s", repo.get_repository_name())
         return repo
     
     @staticmethod
@@ -190,15 +189,15 @@ class Repo:
                     # Check if HRDB info is missing (not found in HRDB)
                     if self._is_hrdb_info_missing(owner):
                         # Skip owners not found in HRDB - continue searching
-                        logger.info("Skipped owner %s - not found in HRDB", 
-                                  owner.get('name', 'unknown'))
+                        logger.debug("Skipped owner %s - not found in HRDB", 
+                                   owner.get('name', 'unknown'))
                         continue
                     else:
                         # Owner found in HRDB - check title exclusion
                         owner_title = owner.get('title', '').strip()
                         if owner_title in EXCLUDED_OWNER_TITLES:
-                            logger.info("Skipped owner %s with excluded title: %s", 
-                                      owner.get('name', 'unknown'), owner_title)
+                            logger.debug("Skipped owner %s with excluded title: %s", 
+                                       owner.get('name', 'unknown'), owner_title)
                             continue  # Skip this owner, try next one
                         else:
                             # Found a suitable owner - current employee with valid title
