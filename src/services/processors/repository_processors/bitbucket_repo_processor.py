@@ -2,7 +2,7 @@ import os
 import logging
 from typing import List
 from collections import Counter
-from src.services.hrdb_clients.hrdb_client import HRDBClient
+from src.services.clients.hrdb_clients.hrdb_client import HRDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class BitbucketRepoProcessor:
     def initialize_client(self):
         """Initialize Bitbucket client with product-specific configuration."""
         try:
-            from src.services.scm_clients.bitbucket_client import BitbucketClient
+            from src.services.clients.scm_clients.bitbucket_client import BitbucketClient
             from CONSTANTS import PRODUCT_SCM_TOKEN_ENV
             
             token_env = PRODUCT_SCM_TOKEN_ENV.get(self.product_name, None)

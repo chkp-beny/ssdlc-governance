@@ -24,9 +24,9 @@ class DataLoader:
             sonar_token (str, optional): Sonar API access token
         """
         import os
-        from src.services.compass_clients.compass_client import CompassClient
-        from src.services.jfrog_clients.jfrog_client import JfrogClient
-        from src.services.sonar_clients.sonar_client import SonarClient
+        from src.services.clients.compass_clients.compass_client import CompassClient
+        from src.services.clients.jfrog_clients.jfrog_client import JfrogClient
+        from src.services.clients.sonar_clients.sonar_client import SonarClient
         compass_url = os.environ["COMPASS_BASE_URL"]
         sonar_url = os.environ["SONAR_BASE_URL"]
         self.compass_client = CompassClient(compass_token, compass_url)

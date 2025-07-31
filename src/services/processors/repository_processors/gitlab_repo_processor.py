@@ -2,7 +2,7 @@ import os
 import logging
 from typing import List
 from collections import Counter
-from src.services.hrdb_clients.hrdb_client import HRDBClient
+from src.services.clients.hrdb_clients.hrdb_client import HRDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class GitLabRepoProcessor:
     def initialize_client(self):
         """Initialize GitLab client with product-specific configuration."""
         try:
-            from src.services.scm_clients.gitlab_client import GitLabClient
+            from src.services.clients.scm_clients.gitlab_client import GitLabClient
             from CONSTANTS import PRODUCT_SCM_TOKEN_ENV
             
             token_env = PRODUCT_SCM_TOKEN_ENV.get(self.product_name, None)

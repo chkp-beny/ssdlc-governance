@@ -4,7 +4,7 @@ import glob
 import logging
 from datetime import datetime
 from typing import Dict, List
-from src.services.jfrog_clients.jfrog_client import JfrogClient
+from src.services.clients.jfrog_clients.jfrog_client import JfrogClient
 
 logger = logging.getLogger(__name__)
 
