@@ -6,11 +6,10 @@ Contains list of Repo objects and DevOps object
 from typing import List, Optional
 import logging
 import os
-import glob
 from dotenv import load_dotenv
 from .devops import DevOps
 from .repo import Repo
-from .vulnerabilities import Vulnerabilities, CodeIssues
+from .vulnerabilities import Vulnerabilities
 import json
 
 # Load environment variables
@@ -73,286 +72,26 @@ class Product:
     
     def load_repositories(self):
         """
-        Load repositories for this product using DataLoader
-        Fetches repositories based on product's SCM type and organization ID
-        Adds progress logging for repo owner retrieval.
+        Load repositories for this product using RepositoryCoordinator.
+        Uses RepositoryCoordinator to delegate to specialized processors.
         """
+        logger.info("Loading repositories for product '%s'", self.name)
+        
         try:
-            # Load repositories using DataLoader with product's SCM info
-            repo_data = self.data_loader.load_repositories(self.scm_type, self.organization_id)
-
-            # Always initialize HRDB client utility
-            from src.services.hrdb_client import HRDBClient
-            hrdb_client = HRDBClient()
-
-            # Modular SCM client initialization
-            scm_clients = self._initialize_scm_clients()
-
-            # Parse repo_data and create Repo objects
-            self.repos = []
-            total_repos = len(repo_data)
-            logger.info("📦 Found %d repositories for product '%s'. Starting repo owner retrieval...", total_repos, self.name)
-            processed_repos = 0
-            for repo_json in repo_data:
-                try:
-                    repo = Repo.from_json(repo_json, self.name)
-                    processed_repos += 1
-                    # Progress logging every 10 repos, and always for first and last
-                    if processed_repos == 1 or processed_repos == total_repos or processed_repos % 10 == 0:
-                        logger.info("🔄 Progress: %d/%d repositories processed for owner detection (%.1f%%)",
-                                    processed_repos, total_repos, (processed_repos/total_repos)*100)
-                    # Populate repo_owners for Bitbucket repos
-                    if self.scm_type == 'bitbucket_server':
-                        bitbucket_client = scm_clients.get('bitbucket_client')
-                        if bitbucket_client:
-                            self._populate_bitbucket_repo_owners(repo, bitbucket_client, hrdb_client)
-                    # Populate repo_owners for GitLab repos
-                    elif self.scm_type == 'gitlab':
-                        gitlab_client = scm_clients.get('gitlab_client')
-                        if gitlab_client:
-                            self._populate_gitlab_repo_owners(repo, gitlab_client, hrdb_client)
-                    # Future SCM types can be handled here
-                    self.repos.append(repo)
-                except (ValueError, KeyError) as e:
-                    logger.warning("Failed to create Repo from JSON for %s: %s", 
-                                  repo_json.get('repo_name', 'unknown'), str(e))
-
-            if self.scm_type == 'github':
-                github_client = scm_clients.get('github_client')
-                if github_client:
-                    self._populate_github_repo_owners(github_client, hrdb_client)
-
-            logger.info("✅ Successfully loaded %d repositories for product '%s' and completed repo owner retrieval.", len(self.repos), self.name)
-        except (ImportError, ValueError) as e:
-            logger.error("Error loading repositories for product '%s': %s", self.name, str(e))
+            from src.services.repository_processors import RepositoryCoordinator
+            
+            # Get compass token from environment
+            compass_token = os.getenv('COMPASS_ACCESS_TOKEN', '')
+            
+            coordinator = RepositoryCoordinator(self.name, self.scm_type, self.organization_id, compass_token)
+            self.repos = coordinator.load_repositories()
+            
+            logger.info("Repository loading completed for product '%s': %d repositories loaded", 
+                       self.name, len(self.repos))
+        except ImportError as e:
+            logger.error("Failed to import RepositoryCoordinator: %s", str(e))
+            raise
     
-    def _initialize_scm_clients(self):
-        clients = {}
-        if self.scm_type == 'bitbucket_server':
-            try:
-                from src.services.bitbucket_client import BitbucketClient
-                from CONSTANTS import PRODUCT_SCM_TOKEN_ENV
-                token_env = PRODUCT_SCM_TOKEN_ENV.get(self.name, None)
-                token = os.getenv(token_env, '') if token_env else ''
-                if not token:
-                    logger.warning("No SCM token found for product '%s', skipping SCM owner detection.", self.name)
-                else:
-                    clients['bitbucket_client'] = BitbucketClient(token)
-            except ImportError as e:
-                logger.error("Failed to import Bitbucket client: %s", str(e))
-        elif self.scm_type == 'gitlab':
-            try:
-                from src.services.gitlab_client import GitlabClient
-                from CONSTANTS import PRODUCT_SCM_TOKEN_ENV
-                token_env = PRODUCT_SCM_TOKEN_ENV.get(self.name, None)
-                token = os.getenv(token_env, '') if token_env else ''
-                if not token:
-                    logger.warning("No SCM token found for product '%s', skipping SCM owner detection.", self.name)
-                else:
-                    clients['gitlab_client'] = GitlabClient(token)
-            except ImportError as e:
-                logger.error("Failed to import Gitlab client: %s", str(e))
-        elif self.scm_type == 'github':
-            try:
-                from src.services.github_client import GitHubClient
-                from CONSTANTS import PRODUCT_SCM_TOKEN_ENV, PRODUCT_SCM_ORG_NAME
-                token_env = PRODUCT_SCM_TOKEN_ENV.get(self.name, None)
-                org = PRODUCT_SCM_ORG_NAME.get(self.name, None)
-                token = os.getenv(token_env, '') if token_env else ''
-                if not token or not org:
-                    logger.warning("No GitHub token or org found for product '%s', skipping GitHub owner detection.", self.name)
-                else:
-                    clients['github_client'] = GitHubClient(token, org)
-            except ImportError as e:
-                logger.error("Failed to import GitHub client: %s", str(e))
-        return clients
-
-    def _populate_github_repo_owners(self, github_client, hrdb_client):
-        """
-        Populate the repo_owners field for all GitHub repos in self.repos using batch GraphQL.
-        Enriches with HRDB info and sorts reviewers by review count (desc).
-        """
-        # Collect all repo names (as expected by GitHubClient)
-        repo_names = []
-        repo_map = {}
-        for repo in self.repos:
-            # Assumes repo.scm_info.full_name is "org/repo"
-            repo_name = getattr(repo.scm_info, 'repo_name', None)
-            if repo_name:
-                repo_names.append(repo_name)
-                repo_map[repo_name] = repo
-
-        if not repo_names:
-            logger.warning("No GitHub repositories found for owner detection in product '%s'", self.name)
-            return
-
-        # Batch fetch reviewers for all repos in chunks of 30
-        batch_size = 30
-        reviewers_by_repo = {}
-
-        for i in range(0, len(repo_names), batch_size):
-            batch = repo_names[i:i + batch_size]
-            batch_num = i // batch_size + 1
-            total_batches = (len(repo_names) + batch_size - 1) // batch_size
-            
-            logger.info(f"🔄 Fetching GitHub PR reviewers for batch {batch_num}/{total_batches} ({len(batch)} repos)...")
-            
-            batch_results = github_client.fetch_repo_reviewers_batch(batch)
-            reviewers_by_repo.update(batch_results)
-
-        if not reviewers_by_repo:
-            logger.warning("No reviewers returned from GitHub batch queries for product '%s'", self.name)
-            return
-
-        for repo_name, reviewers in reviewers_by_repo.items():
-            repo = repo_map.get(repo_name)
-            if not repo:
-                continue
-            if not reviewers:
-                repo.repo_owners = []
-                continue
-
-            # Count reviewers by frequency
-            from collections import Counter
-            counts = Counter(reviewers)
-            top_reviewers = counts.most_common(3)
-
-            enriched_owners = []
-            for username, review_count in top_reviewers:
-                # Normalize username if it starts with 'chkp-'
-                if username and username.startswith('chkp-'):
-                    normalized_username = username[len('chkp-'):]
-                else:
-                    normalized_username = username
-                hr_info = hrdb_client.get_user_data(normalized_username)
-                enriched_owners.append({
-                    'name': normalized_username,
-                    'review_count': review_count,
-                    'general_manager': hr_info.get('general_manager'),
-                    'vp': hr_info.get('vp'),
-                    'title': hr_info.get('title'),
-                    'department': hr_info.get('department'),
-                    'manager_name': hr_info.get('manager_name'),
-                    'director': hr_info.get('director'),
-                    'vp2': hr_info.get('vp2'),
-                    'c_level': hr_info.get('c_level'),
-                    'worker_id': hr_info.get('worker_id'),
-                    'full_name': hr_info.get('full_name')
-                })
-            repo.repo_owners = enriched_owners
-
-    def _populate_gitlab_repo_owners(self, repo, gitlab_client, hrdb_client):
-        """
-        Populate the repo_owners field for a GitLab repo using project owners and HRDB info.
-        Sort owners so that those with the most frequent (case-insensitive) 'vp' value appear first.
-        Owners with vp=None or 'unknown' (case-insensitive) are always at the end.
-        """
-        project_id = getattr(repo.scm_info, 'id', None)
-        if not project_id:
-            logger.warning("No project_id found for repo '%s', skipping owner detection.", getattr(repo.scm_info, 'full_name', 'unknown'))
-            repo.repo_owners = []
-            return
-
-        owners = gitlab_client.fetch_project_owners(project_id)
-        if not owners:
-            logger.warning("No owners found for GitLab project_id '%s'", project_id)
-            repo.repo_owners = []
-            return
-
-        enriched_owners = []
-        for owner in owners:
-            username = owner.get('username')
-            access_level = owner.get('access_level')
-            hr_info = hrdb_client.get_user_data(username)
-            enriched_owners.append({
-                'name': username,
-                'access_level': access_level,
-                'general_manager': hr_info.get('general_manager'),
-                'vp': hr_info.get('vp'),
-                'title': hr_info.get('title'),
-                'department': hr_info.get('department'),
-                'manager_name': hr_info.get('manager_name'),
-                'director': hr_info.get('director'),
-                'vp2': hr_info.get('vp2'),
-                'c_level': hr_info.get('c_level'),
-                'worker_id': hr_info.get('worker_id'),
-                'full_name': hr_info.get('full_name')
-            })
-
-        # Sorting logic (case-insensitive for vp)
-        # 1. Group owners by vp (case-insensitive, except None/unknown)
-        # 2. Count frequency of each vp (excluding None/unknown)
-        # 3. Owners with most frequent vp (case-insensitive) come first
-        # 4. Owners with vp None or 'unknown' (case-insensitive) always at the end
-        from collections import Counter, defaultdict
-
-        def normalize_vp(vp):
-            if vp is None:
-                return None
-            if isinstance(vp, str) and vp.strip().lower() == 'unknown':
-                return None
-            return vp.strip().lower() if isinstance(vp, str) else vp
-
-        # Build list of normalized vps (excluding None/unknown)
-        vps = [normalize_vp(owner['vp']) for owner in enriched_owners if normalize_vp(owner['vp']) is not None]
-        vp_counter = Counter(vps)
-
-        # For each owner, assign a sort key:
-        #   - (-(vp_count), original_index) for owners with a valid vp
-        #   - (float('inf'), original_index) for owners with vp None/unknown (always at end)
-        def owner_sort_key(owner_with_index):
-            idx, owner = owner_with_index
-            vp_norm = normalize_vp(owner['vp'])
-            if vp_norm is None:
-                return (float('inf'), idx)
-            # Negative count for descending sort
-            return (-vp_counter[vp_norm], idx)
-
-        # Attach original index to preserve order among ties
-        owners_with_index = list(enumerate(enriched_owners))
-        sorted_owners = [owner for idx, owner in sorted(owners_with_index, key=owner_sort_key)]
-
-        repo.repo_owners = sorted_owners
-
-    def _populate_bitbucket_repo_owners(self, repo, bitbucket_client, hrdb_client):
-        """
-        Populate the repo_owners field for a Bitbucket repo using PR reviewers and HRDB info.
-        """
-        # Parse project_key and repo_slug from scm_info.full_name
-        try:
-            project_key, repo_slug = repo.scm_info.full_name.split('/', 1)
-        except Exception as e:
-            logger.warning("Failed to parse project/repo from full_name '%s': %s", repo.scm_info.full_name, str(e))
-            repo.repo_owners = []
-            return
-
-        reviewers = bitbucket_client.fetch_recent_merged_pr_reviewers(project_key, repo_slug)
-        if not reviewers:
-            logger.warning("No reviewers found for repo '%s'", repo.scm_info.full_name)
-            repo.repo_owners = []
-            return
-
-        from collections import Counter
-        counts = Counter(reviewers)
-        top_reviewers = counts.most_common(3)
-
-        repo.repo_owners = []
-        for username, review_count in top_reviewers:
-            hr_info = hrdb_client.get_user_data(username)
-            repo.repo_owners.append({
-                'name': username,
-                'review_count': review_count,
-                'general_manager': hr_info['general_manager'],
-                'vp': hr_info['vp'],
-                'title': hr_info.get('title'),
-                'department': hr_info.get('department'),
-                'manager_name': hr_info.get('manager_name'),
-                'director': hr_info.get('director'),
-                'vp2': hr_info.get('vp2'),
-                'c_level': hr_info.get('c_level'),
-                'worker_id': hr_info.get('worker_id'),
-                'full_name': hr_info.get('full_name')
-            })
     
     def load_ci_data(self):
         """
