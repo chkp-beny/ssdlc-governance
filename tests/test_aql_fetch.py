@@ -29,10 +29,12 @@ class TestAqlArtifactFetch:
         """Create Product instance for testing parsing methods"""
         return Product(name="test", scm_type="github", organization_id="1")
 
-    def test_parse_artifact_path(self, product):
+    def test_parse_artifact_path(self):
         """Test artifact path parsing used in JFrog vulnerability processing"""
+        from src.services.artifact_processors import ArtifactParser
+        
         # Standard path like cyberint-docker-local/staging/alert-status-update-handler/e9f884d22bfbcff6cb2e91a68815c4b07581e24c/manifest.json
-        result = product._parse_artifact_path("cyberint-docker-local/staging/alert-status-update-handler/e9f884d22bfbcff6cb2e91a68815c4b07581e24c/manifest.json")
+        result = ArtifactParser.parse_artifact_path("cyberint-docker-local/staging/alert-status-update-handler/e9f884d22bfbcff6cb2e91a68815c4b07581e24c/manifest.json")
         assert result is not None
         repo_name, path, name, full_path = result
         assert repo_name == "cyberint-docker-local"
@@ -41,7 +43,7 @@ class TestAqlArtifactFetch:
         assert full_path == "cyberint-docker-local/staging/alert-status-update-handler/e9f884d22bfbcff6cb2e91a68815c4b07581e24c/manifest.json"
         
         # Another example: hec-docker-local/scheduler-dispatcher/2025-03-19_AV-86175_fedramp_2/manifest.json
-        result = product._parse_artifact_path("hec-docker-local/scheduler-dispatcher/2025-03-19_AV-86175_fedramp_2/manifest.json")
+        result = ArtifactParser.parse_artifact_path("hec-docker-local/scheduler-dispatcher/2025-03-19_AV-86175_fedramp_2/manifest.json")
         assert result is not None
         repo_name, path, name, full_path = result
         assert repo_name == "hec-docker-local"
@@ -50,7 +52,7 @@ class TestAqlArtifactFetch:
         assert full_path == "hec-docker-local/scheduler-dispatcher/2025-03-19_AV-86175_fedramp_2/manifest.json"
         
         # Root level file (just repo/file)
-        result = product._parse_artifact_path("test-repo/manifest.json")
+        result = ArtifactParser.parse_artifact_path("test-repo/manifest.json")
         assert result is not None
         repo_name, path, name, full_path = result
         assert repo_name == "test-repo"
@@ -59,26 +61,28 @@ class TestAqlArtifactFetch:
         assert full_path == "test-repo/manifest.json"
         
         # Malformed path (missing slash)
-        result = product._parse_artifact_path("malformed")
+        result = ArtifactParser.parse_artifact_path("malformed")
         assert result is None
 
-    def test_is_local_repo(self, product):
+    def test_is_local_repo(self):
         """Test local repository detection"""
+        from src.services.artifact_processors import ArtifactParser
+        
         # Local repositories - should return True
-        assert product._is_local_repo("cyberint-docker-local") == True
-        assert product._is_local_repo("hec-docker-local") == True
-        assert product._is_local_repo("test-maven-local") == True
+        assert ArtifactParser.is_local_repo("cyberint-docker-local") == True
+        assert ArtifactParser.is_local_repo("hec-docker-local") == True
+        assert ArtifactParser.is_local_repo("test-maven-local") == True
         
         # Remote repositories - should return False
-        assert product._is_local_repo("hec-core-ext-pypi-remote") == False
-        assert product._is_local_repo("central-maven-remote") == False
-        assert product._is_local_repo("npm-remote") == False
+        assert ArtifactParser.is_local_repo("hec-core-ext-pypi-remote") == False
+        assert ArtifactParser.is_local_repo("central-maven-remote") == False
+        assert ArtifactParser.is_local_repo("npm-remote") == False
         
         # No dash - should return False
-        assert product._is_local_repo("nodash") == False
+        assert ArtifactParser.is_local_repo("nodash") == False
         
         # Cache repositories - should return True (they contain "local")
-        assert product._is_local_repo("cache-local") == True
+        assert ArtifactParser.is_local_repo("cache-local") == True
 
     @responses.activate
     def test_query_aql_full_repo(self, jfrog_client):
@@ -209,25 +213,23 @@ class TestProductVulnerabilityParsing:
         """Create Product instance for testing"""
         return Product(name="test", scm_type="github", organization_id="1")
     
-    def test_find_build_name_in_aql(self, product):
-        """Test finding build name in AQL response data"""
+    def test_find_build_name_in_aql(self):
+        """Test finding build name in AQL data"""
+        from src.services.artifact_processors import AqlCacheManager
+        
         aql_data = {
             "results": [
                 {
-                    "repo": "test-repo",
                     "path": "staging/alert-service",
                     "name": "manifest.json",
-                    "type": "file",
                     "properties": [
                         {"key": "build.name", "value": "alert-service"},
                         {"key": "build.number", "value": "123"}
                     ]
                 },
                 {
-                    "repo": "test-repo", 
-                    "path": "staging/another-service",
+                    "path": "staging/another-service", 
                     "name": "manifest.json",
-                    "type": "file",
                     "properties": [
                         {"key": "build.name", "value": "another-service"},
                         {"key": "build.number", "value": "456"}
@@ -236,24 +238,28 @@ class TestProductVulnerabilityParsing:
             ]
         }
         
-        # Test finding existing build name
-        build_name = product._find_build_name_in_aql(aql_data, "staging/alert-service", "manifest.json")
-        assert build_name == "alert-service"
+        # Test successful match
+        build_info = AqlCacheManager.extract_artifact_build_info_from_aql(aql_data, "staging/alert-service", "manifest.json")
+        assert build_info is not None
+        assert build_info[0] == "alert-service"  # build_name
         
-        # Test finding different build name
-        build_name = product._find_build_name_in_aql(aql_data, "staging/another-service", "manifest.json")
-        assert build_name == "another-service"
+        # Test another match
+        build_info = AqlCacheManager.extract_artifact_build_info_from_aql(aql_data, "staging/another-service", "manifest.json")
+        assert build_info is not None
+        assert build_info[0] == "another-service"
         
-        # Test not finding build name (wrong path)
-        build_name = product._find_build_name_in_aql(aql_data, "wrong/path", "manifest.json")
-        assert build_name is None
+        # Test no match - wrong path
+        build_info = AqlCacheManager.extract_artifact_build_info_from_aql(aql_data, "wrong/path", "manifest.json")
+        assert build_info is None
         
-        # Test not finding build name (wrong file name)
-        build_name = product._find_build_name_in_aql(aql_data, "staging/alert-service", "wrong.json")
-        assert build_name is None
+        # Test no match - wrong name
+        build_info = AqlCacheManager.extract_artifact_build_info_from_aql(aql_data, "staging/alert-service", "wrong.json")
+        assert build_info is None
     
-    def test_match_build_name_to_repo(self, product):
+    def test_match_build_name_to_repo(self):
         """Test matching build name to repository"""
+        from src.services.artifact_processors import ArtifactParser
+        
         repo_build_names_map = {
             "alert-service": {"alert-service", "alert-service-v2"},
             "scoring-manager": {"scoring-manager", "scoring-manager-beta"},
@@ -261,13 +267,13 @@ class TestProductVulnerabilityParsing:
         }
         
         # Test exact match
-        repo_name = product._match_build_name_to_repo("alert-service", repo_build_names_map)
+        repo_name = ArtifactParser.match_build_name_to_repo("alert-service", repo_build_names_map)
         assert repo_name == "alert-service"
         
         # Test match in different repo
-        repo_name = product._match_build_name_to_repo("scoring-manager-beta", repo_build_names_map)
+        repo_name = ArtifactParser.match_build_name_to_repo("scoring-manager-beta", repo_build_names_map)
         assert repo_name == "scoring-manager"
         
         # Test no match
-        repo_name = product._match_build_name_to_repo("non-existent-build", repo_build_names_map)
+        repo_name = ArtifactParser.match_build_name_to_repo("non-existent-build", repo_build_names_map)
         assert repo_name is None
