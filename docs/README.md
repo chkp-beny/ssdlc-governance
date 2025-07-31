@@ -4,9 +4,49 @@
 
 RASOS is a comprehensive system for assessing and managing security operations across multiple software development repositories. It provides a unified view of CI/CD status, vulnerability assessments, and security compliance across different products and repositories.
 
-## Object Model Architecture
+**Recent Update**: The system has been refactored from a monolithic Product class to a modular, service-oriented architecture with specialized processors and coordinators for improved maintainability and extensibility.
 
-### Core Hierarchy
+## Modular Architecture
+
+### Service Layer Architecture
+
+```
+Application Layer:
+    └── generate_product_report.py
+        └── ReportingManager
+
+Product Management Layer:
+    └── Product
+        ├── load_repositories() → RepositoryCoordinator
+        ├── load_ci_status() → CIStatusCoordinator  
+        └── load_vulnerabilities() → VulnerabilityCoordinator
+
+Repository Processing Layer:
+    └── RepositoryCoordinator
+        ├── GitHubRepoProcessor
+        ├── BitbucketRepoProcessor
+        └── GitLabRepoProcessor
+
+CI Status Processing Layer:
+    └── CIStatusCoordinator
+        ├── JFrogCIProcessor
+        └── SonarCIProcessor
+
+Vulnerability Processing Layer:
+    └── VulnerabilityCoordinator
+        ├── JFrogVulnerabilityProcessor
+        └── SonarVulnerabilityProcessor
+
+External API Layer:
+    ├── CompassClient
+    ├── JFrogClient
+    ├── SonarClient
+    ├── GitHubClient
+    ├── BitbucketClient
+    └── HRDBClient
+```
+
+### Data Model Hierarchy
 
 ```
 ProductPillar
@@ -15,7 +55,7 @@ ProductPillar
         └── Repos (1:N)
             └── Repository
                 ├── SCMInfo (1:1)
-                ├── HRInfo (1:1) 
+                ├── repo_owners (list of dicts) 
                 ├── CIStatus (1:1)
                 │   ├── SonarCIStatus (1:1)
                 │   └── JfrogCIStatus (1:1)
@@ -29,11 +69,6 @@ ProductPillar
                 └── EnforcementStatus (1:1)
                     ├── EnforceSonarStatus (1:1)
                     └── EnforceXrayStatus (1:1)
-
-Services Layer:
-    └── DataLoader
-        ├── CompassClient
-        └── JfrogClient
 ```
 
 ## Model Classes Documentation
@@ -47,24 +82,56 @@ Services Layer:
 - **Methods**: Product management and aggregation
 
 ### 2. Product
-**Purpose**: Product-level aggregation containing repositories and DevOps ownership
+**Purpose**: Product-level orchestration with delegated processing to specialized coordinators
 - **Contains**: List of Repositories, DevOps contact
-- **Uses**: DataLoader service for API operations
+- **Uses**: Specialized coordinator services for each data type
 - **Properties**:
   - `name`: Product name (e.g., "Cyberint", "SaaS")
   - `scm_type`: Source control type ("github", "bitbucket_server", "gitlab")
   - `organization_id`: Organization ID in Compass system
   - `devops`: DevOps contact information
   - `repos`: List of Repository objects
-  - `data_loader`: DataLoader service instance (initialized in constructor)
 - **Key Methods**:
-  - `load_repositories()`: Fetch repositories from SCM using DataLoader
-  - `load_ci_data()`: Load CI/CD status data using DataLoader
-  - `load_vulnerabilities()`: Load vulnerability data using DataLoader
-  - `_load_jfrog_ci_data()`: JFrog CI status integration
-  - `_load_sonar_ci_data()`: SonarQube CI status integration
-  - `_load_jfrog_vulnerabilities()`: JFrog vulnerability data
-  - `_load_sonar_vulnerabilities()`: SonarQube issues and secrets data
+  - `load_repositories()`: Delegates to RepositoryCoordinator
+  - `load_ci_status()`: Delegates to CIStatusCoordinator
+  - `load_vulnerabilities()`: Delegates to VulnerabilityCoordinator
+- **Architecture**: Orchestrator pattern - coordinates specialized services rather than implementing logic directly
+
+## Service Layer Components
+
+### RepositoryCoordinator
+**Purpose**: Orchestrates repository data collection from multiple SCM sources
+- **Processors**: GitHubRepoProcessor, BitbucketRepoProcessor, GitLabRepoProcessor
+- **Key Methods**:
+  - `load_repositories()`: Load repos from appropriate SCM processor
+  - `_populate_repository_owners()`: Enrich repos with owner data from SCM and HRDB
+- **Integration**: Uses SCM-specific processors and HRDBClient for owner mapping
+
+### CIStatusCoordinator  
+**Purpose**: Coordinates CI status data collection from build systems
+- **Processors**: JFrogCIProcessor, SonarCIProcessor
+- **Key Methods**:
+  - `load_ci_status()`: Update repos with CI status from all sources
+- **Integration**: Manages JFrog build matching and SonarQube project mapping
+
+### VulnerabilityCoordinator
+**Purpose**: Orchestrates vulnerability data collection and processing
+- **Processors**: JFrogVulnerabilityProcessor, SonarVulnerabilityProcessor  
+- **Key Methods**:
+  - `load_vulnerabilities()`: Update repos with vulnerability data from all sources
+- **Integration**: Coordinates dependency and code vulnerability processing
+
+### JFrogVulnerabilityProcessor
+**Purpose**: Specialized processor for JFrog dependency vulnerabilities with enhanced AQL cache logic
+- **Key Features**:
+  - AQL cache management for artifact metadata
+  - Build name extraction from properties array (e.g., "Diagnostics/web-engine-testing-service/staging" → "web-engine-testing-service")
+  - Artifact-to-repository matching via build names
+  - Full DeployedArtifact metadata population
+- **Key Methods**:
+  - `process_vulnerabilities()`: Main processing pipeline
+  - `_extract_build_name_from_path()`: Extract clean build names from paths
+  - `_match_artifact_to_repository()`: Match artifacts to repos using AQL cache and build names
 
 ### 3. Repo (Repository)
 **Purpose**: Individual repository with all associated metadata and status
@@ -72,7 +139,7 @@ Services Layer:
 - **Properties**:
   - `product_name`: Parent product name
   - `scm_info`: Source control metadata
-  - `hr_info`: Human resources/ownership info
+  - `repo_owners`: List of repository owner dictionaries (replaces hr_info)
   - `ci_status`: CI/CD pipeline status
   - `cd_status`: Deployment status
   - `vulnerabilities`: Security vulnerability data
@@ -80,7 +147,9 @@ Services Layer:
 - **Key Methods**:
   - `get_repository_name()`: Extract repository name
   - `from_json()`: Create from API response
+  - `get_primary_owner_dict()`: Get primary owner with fallback logic
   - `update_*()`: Update specific data objects
+- **Owner Management**: Enhanced with HRDB integration and DevOps fallback logic
 
 ## Data Objects
 
@@ -95,13 +164,20 @@ Services Layer:
   - `contributors_count`: Number of contributors
   - `created_at`/`updated_at`: Timestamps
 
-### 5. HRInfo
-**Purpose**: Human resources and ownership information
-- **Properties**:
-  - `owner_name`: Repository owner
-  - `owner_email`: Owner contact email
-  - `team_name`: Responsible team
-  - `last_activity`: Last activity timestamp
+### 5. Repository Owners
+**Purpose**: Enhanced ownership information with HRDB integration
+- **Structure**: List of owner dictionaries with full HR data
+- **Properties per Owner**:
+  - `name`: Repository owner username
+  - `title`: Job title from HRDB
+  - `general_manager`: GM from HRDB hierarchy  
+  - `vp`: VP from HRDB hierarchy
+  - `director`: Director from HRDB hierarchy
+- **Features**:
+  - HRDB integration for complete organizational hierarchy
+  - DevOps fallback when owners not found in HRDB
+  - Title exclusion logic for certain roles
+  - Primary owner selection with smart fallback
 
 ### 6. CIStatus
 **Purpose**: Continuous Integration pipeline status
@@ -113,7 +189,8 @@ Services Layer:
     - `is_main_branch_scanned`: Main branch scan status
   - **JfrogCIStatus**: JFrog Artifactory integration status
     - `is_exist`: Build exists in JFrog
-    - `build_name`: JFrog build identifier
+    - `matched_build_names`: Set of build names matched to this repository
+    - `latest_build_info`: Most recent build metadata
 
 ### 7. CDStatus
 **Purpose**: Continuous Deployment status
@@ -154,13 +231,16 @@ Services Layer:
   - `get_critical_artifacts()`: Artifacts with critical vulnerabilities
 
 ### 11. DeployedArtifact
-**Purpose**: Individual artifact vulnerability information
+**Purpose**: Individual artifact vulnerability information with enhanced build metadata
 - **Properties**:
   - `artifact_key`: Full artifact identifier
-  - `repo_name`: Associated repository
+  - `repo_name`: Associated JFrog repository (e.g., cyberint-docker-local)
   - `critical_count`, `high_count`, `medium_count`, `low_count`, `unknown_count`: Severity counts
   - `artifact_type`: Artifact type (docker, npm, maven, etc.)
-  - `build_name`, `build_number`: Build information
+  - `build_name`: Extracted build name (e.g., "web-engine-testing-service")
+  - `build_number`: Build number from properties
+  - `build_timestamp`: Build timestamp for sorting
+  - `sha256`: Artifact checksum
   - `created_at`, `updated_at`: Timestamps
 - **Key Methods**:
   - `get_total_count()`: Total vulnerability count
@@ -183,17 +263,9 @@ Services Layer:
 
 ## Service Layer
 
-### 14. DataLoader (Service)
-**Purpose**: Service class that orchestrates all API calls for data fetching
-- **Architecture**: Service layer component used by Product objects
-- **Contains**: CompassClient, JfrogClient instances
-- **Initialization**: Created by Product with API credentials from environment
-- **Methods**:
-  - `load_repositories()`: Fetch repository data from Compass API
-  - `test_connections()`: Verify API connectivity for all clients
-- **Usage**: Each Product creates its own DataLoader instance during initialization
+### External API Clients
 
-### 15. CompassClient
+### 14. CompassClient
 **Purpose**: Compass API integration client
 - **Key Methods**:
   - `fetch_repositories()`: Get repository data
@@ -202,11 +274,20 @@ Services Layer:
   - `fetch_sonarqube_secrets()`: Get SonarQube secrets count
   - `test_connection()`: Test API connectivity
 
-### 16. JfrogClient
-**Purpose**: JFrog Artifactory API integration
+### 15. JfrogClient
+**Purpose**: JFrog Artifactory API integration with enhanced AQL support
 - **Key Methods**:
   - `fetch_all_project_builds()`: Get build information
+  - `query_aql_artifacts()`: Query artifact metadata using AQL
+  - `query_aql_specific_artifacts()`: Optimized queries for specific artifacts
   - `test_connection()`: Test JFrog connectivity
+- **Enhancement**: Added AQL query support for vulnerability artifact matching
+
+### 16. Additional Clients
+- **SonarClient**: SonarQube API integration
+- **GitHubClient**: GitHub API integration  
+- **BitbucketClient**: Bitbucket API integration
+- **HRDBClient**: Internal HR database integration for owner mapping
 
 ## Configuration Constants
 
@@ -225,36 +306,44 @@ Services Layer:
 
 ## API Integration Flow
 
-### 1. Repository Loading
+### 1. Repository Loading (Enhanced)
 ```
 Product.load_repositories()
-    └── DataLoader.load_repositories(scm_type, org_id)
-        └── CompassClient.fetch_repositories()
-            └── Parse JSON → Create Repo objects
+    └── RepositoryCoordinator.load_repositories()
+        ├── GitHubRepoProcessor.load_repositories()
+        ├── BitbucketRepoProcessor.load_repositories()
+        └── _populate_repository_owners()
+            ├── Fetch recent PR reviewers from SCM
+            └── Enrich with HRDB data via HRDBClient
 ```
 
-### 2. CI Data Loading
+### 2. CI Data Loading (Refactored)
 ```
-Product.load_ci_data()
-    ├── _load_jfrog_ci_data()
-    │   └── JfrogClient.fetch_all_project_builds()
-    │       └── Update JfrogCIStatus.is_exist
-    └── _load_sonar_ci_data()
-        └── CompassClient.fetch_repositories("sonarqube")
-            └── Update SonarCIStatus (is_exist, project_key)
+Product.load_ci_status()
+    └── CIStatusCoordinator.load_ci_status()
+        ├── JFrogCIProcessor.process_ci_status()
+        │   ├── JfrogClient.fetch_all_project_builds()
+        │   ├── Parse build metadata and extract source repo info
+        │   └── Match builds to repositories → Update JfrogCIStatus
+        └── SonarCIProcessor.process_ci_status()
+            ├── CompassClient.fetch_repositories("sonarqube")
+            └── Map projects to repositories → Update SonarCIStatus
 ```
 
-### 3. Vulnerability Loading
+### 3. Vulnerability Loading (Enhanced)
 ```
 Product.load_vulnerabilities()
-    ├── _load_jfrog_vulnerabilities()
-    │   └── CompassClient.fetch_jfrog_vulnerabilities()
-    │       └── Create DeployedArtifact objects
-    │           └── Update DependenciesVulnerabilities
-    └── _load_sonar_vulnerabilities()
-        ├── CompassClient.fetch_sonarqube_issues()
-        ├── CompassClient.fetch_sonarqube_secrets()
-        └── Create CodeIssues objects with all issue types + secrets
+    └── VulnerabilityCoordinator.load_vulnerabilities()
+        ├── JFrogVulnerabilityProcessor.process_vulnerabilities()
+        │   ├── CompassClient.fetch_jfrog_vulnerabilities()
+        │   ├── Load AQL cache files for artifact metadata
+        │   ├── Extract build names from properties array
+        │   ├── Match artifacts to repositories via build names
+        │   └── Create DeployedArtifact with full metadata
+        └── SonarVulnerabilityProcessor.process_vulnerabilities()
+            ├── CompassClient.fetch_sonarqube_issues()
+            ├── CompassClient.fetch_sonarqube_secrets()
+            └── Create CodeIssues with all issue types + secrets
 ```
 
 ## API Endpoints
@@ -267,110 +356,31 @@ Product.load_vulnerabilities()
 
 ### JFrog API
 - **Project Builds**: `/artifactory/api/build?project={project_name}`
+- **Build Metadata**: `/artifactory/api/build/{build_name}?project={project_name}`
+- **Build Details**: `/artifactory/api/build/{build_name}/{build_number}?project={project_name}`
+- **AQL Artifacts Query**: `/artifactory/api/search/aql` (POST with AQL query)
+- **System Ping**: `/xray/api/v1/system/ping`
+- **Specific Artifacts AQL**: `/artifactory/api/search/aql` (POST with $or operator for multiple artifacts)
 
 ## Data Flow Architecture
 
-### 1. Initialization
+### 1. Initialization (Modular)
 1. Create ProductPillar with products from PILLAR_PRODUCTS
 2. Initialize Product with SCM type and organization ID
-3. Product creates DataLoader service instance with API credentials
-4. DataLoader initializes API clients (CompassClient, JfrogClient)
+3. Product creates specialized coordinators (Repository, CI, Vulnerability)
+4. Each coordinator initializes appropriate processors and API clients
+5. Processors establish connections to external services (Compass, JFrog, Sonar, etc.)
 
-### 2. Data Loading Pipeline
-1. **Repository Discovery**: Load repositories from SCM
-2. **CI Status Check**: Verify CI pipeline existence
-3. **Vulnerability Assessment**: Fetch security vulnerability data
-4. **Aggregation**: Compile data into unified objects
+### 2. Data Loading Pipeline (Service-Oriented)
+1. **Repository Discovery**: RepositoryCoordinator → SCM Processors → Repository objects
+2. **Owner Enrichment**: HRDB integration for organizational hierarchy
+3. **CI Status Assessment**: CIStatusCoordinator → Build system processors
+4. **Vulnerability Analysis**: VulnerabilityCoordinator → Security data processors
+5. **Data Aggregation**: Compile all data into unified repository objects
 
-### 3. Integration Points
-- **Compass API**: Central data source for repositories and vulnerabilities
-- **JFrog Artifactory**: CI builds and dependency vulnerabilities
-- **SonarQube**: Code quality issues and secrets detection
-
-## Security and Vulnerability Management
-
-### Issue Types Supported
-- **VULNERABILITY**: Security vulnerabilities in code
-- **CODE_SMELL**: Code quality issues
-- **BUG**: Software bugs
-- **SECURITY_HOTSPOT**: Potential security issues requiring review
-- **Secrets**: Detected credentials and sensitive data
-
-### Severity Levels
-- **Critical/Blocker**: Immediate action required
-- **High/Major**: High priority fixes
-- **Medium/Minor**: Medium priority issues
-- **Low/Info**: Low priority or informational
-
-### Vulnerability Sources
-- **Dependencies**: Third-party library vulnerabilities (JFrog Xray)
-- **Code**: Static analysis security issues (SonarQube)
-- **Secrets**: Hardcoded credentials and sensitive data (SonarQube)
-
-## Testing Architecture
-
-### Test Coverage
-- **Unit Tests**: Individual model classes
-- **Integration Tests**: API integration and data loading
-- **Mock Data**: Comprehensive mock responses for all APIs
-
-### Test Files
-- `test_product_integration.py`: Full product data loading test
-- `test_*_integration.py`: Individual API integration tests
-- `test_*.py`: Unit tests for model classes
-
-### Mock Data Files
-- `mock_github_repositories_response.json`: Repository data
-- `mock_jfrog_vulnerabilities_response.json`: JFrog vulnerability data
-- `mock_sonarqube_issues_response.json`: SonarQube issues data
-- `mock_sonarqube_secrets_response.json`: SonarQube secrets data
-- `mock_jfrog_build_endpoint.json`: JFrog build data
-
-## Environment Configuration
-
-### Required Environment Variables
-- `COMPASS_ACCESS_TOKEN`: Compass API authentication
-- `COMPASS_BASE_URL`: Compass API base URL
-- `CYBERINT_JFROG_ACCESS_TOKEN`: JFrog API authentication
-
-### Configuration Files
-- `CONSTANTS.py`: Product mappings and configuration
-- `requirements.txt`: Python dependencies
-- `.env`: Environment variables (not in repository)
-
-## Recent Changes and Evolution
-
-### CodeIssues Refactoring
-- **From**: `CodeVulnerabilities` (vulnerability-specific)
-- **To**: `CodeIssues` (flexible issue type support)
-- **Benefits**: 
-  - Supports all SonarQube issue types
-  - Backward compatibility maintained
-  - Extensible for future issue types
-
-### Secrets Integration
-- **New Feature**: SonarQube secrets detection
-- **Implementation**: `secrets_count` field in CodeIssues
-- **API**: New `/api/remediation/sonarqube/secrets` endpoint
-- **Flow**: Integrated with existing SonarQube data loading
-
-### Flexible Architecture
-- **Design**: Extensible object model
-- **APIs**: Multiple data source integration
-- **Configuration**: Product-specific mappings
-- **Testing**: Comprehensive mock data support
-
-## Future Enhancements
-
-### Planned Features
-1. **Branch-specific CI scanning**: Track which branches are scanned
-2. **Real-time updates**: Webhook integration for live data
-3. **Policy enforcement**: Automated quality gate management
-4. **Reporting**: Dashboard and metrics generation
-5. **Additional integrations**: More security tools and platforms
-
-### Architecture Improvements
-1. **Caching**: API response caching for performance
-2. **Async processing**: Concurrent data loading
-3. **Configuration management**: Dynamic product configuration
-4. **Error handling**: Robust error recovery and retry logic
+### 3. Integration Points (Enhanced)
+- **Compass API**: Central data source for repositories, vulnerabilities, and SonarQube data
+- **JFrog Artifactory**: Build information, AQL queries, and dependency vulnerabilities
+- **SonarQube**: Code quality issues and secrets detection (via Compass)
+- **SCM Systems**: Repository metadata and owner information (GitHub, Bitbucket, GitLab)
+- **HRDB**: Organizational hierarchy and employee data for owner mapping
