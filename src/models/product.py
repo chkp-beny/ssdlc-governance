@@ -987,16 +987,23 @@ class Product:
     def load_vulnerabilities(self):
         """
         Load vulnerability data for repositories in this product.
+        Uses VulnerabilityCoordinator to delegate to specialized processors.
         """
         logger.info("Loading vulnerability data for product '%s'", self.name)
         
-        # Load JFrog vulnerabilities
-        self._load_jfrog_vulnerabilities()
-        
-        # Load Sonar vulnerabilities
-        self._load_sonar_vulnerabilities()
-        
-        logger.info("Vulnerability data loading completed for product '%s'", self.name)
+        try:
+            from src.services.vulnerability_processors import VulnerabilityCoordinator
+            coordinator = VulnerabilityCoordinator(self.name, self.organization_id)
+            results = coordinator.load_all_vulnerabilities(self.repos)
+            
+            logger.info("Vulnerability data loading completed for product '%s': JFrog=%d, Sonar=%d repos updated", 
+                       self.name, results['jfrog_updated'], results['sonar_updated'])
+        except ImportError as e:
+            logger.error("Failed to import VulnerabilityCoordinator, falling back to original methods: %s", str(e))
+            # Fallback to original methods if new services are not available
+            self._load_jfrog_vulnerabilities()
+            self._load_sonar_vulnerabilities()
+            logger.info("Vulnerability data loading completed for product '%s' (fallback mode)", self.name)
     
     def _load_jfrog_vulnerabilities(self):
         """
